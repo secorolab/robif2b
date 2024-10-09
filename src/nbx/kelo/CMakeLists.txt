@@ -1,6 +1,7 @@
 add_library(kelo SHARED
   kelo_drive.c
   kelo_power_board.c
+  freddy_2_power_board.c
 )
 
 target_include_directories(kelo
