@@ -12,19 +12,19 @@ Clone SOEM library in the src folder of robif2b (the current repository) [path i
 git clone https://github.com/OpenEtherCATsociety/SOEM
 ```
 
-Replace `STATIC` with `SHARED` on line 72 in CMakeList.txt of SOEM,
+Replace `STATIC` with `SHARED` on line 72 in CMakeList.txt of SOEM
 
 ```
 add_library(soem SHARED
   ...
 ```
 
-Build the SOEM library,
+Build the SOEM library
 
 ```
 cd robif2b
 mkdir install 
-cd SOEM
+cd src/SOEM
 mkdir build
 cd build
 cmake -DCMAKE_INSTALL_PREFIX=<path to created install folder>/install ..
@@ -33,9 +33,9 @@ make install
 
 ### Building robif2b
 
-Before proceeding with the building, make sure the eternet port name is correct in the script. For example, in line 78 of freddy_2_example.c file, modify the value of `state.ecat.ethernet_if` if required.
+Before proceeding with the building, make sure the eternet port name is correct in the script. For example, in line 78 of freddy_2_example.c file, modify the value of `state.ecat.ethernet_if` if necessary.
 
-Commands to build robif2b are,
+Build robif2b library
 
 ```bash
 cd robif2b
