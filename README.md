@@ -79,3 +79,14 @@
 cd ~/<ws>/build
 sudo ./robif2b/src/example/freddy_2_example
 ```
+
+* Kelo Power Board commands:'
+    One of the following command can be used to control the power board of the Kelo drive. (L187-L191 in freddy_2_example.c)
+
+    ```c
+    BASE_ON_TORSO_OFF 0b00000111
+    TORSO_ON_BASE_OFF 0b00100100
+    BASE_DON_TORSO_ON 0b00100000  // base (default on at startup), torso on
+    BASE_AND_TORSO_ON 0b00100111
+    BASE_AND_TORSO_OFF 0b00000100
+    ```
