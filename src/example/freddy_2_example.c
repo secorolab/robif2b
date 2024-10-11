@@ -75,7 +75,7 @@ int main()
     // Configuration
     state.num_drives              = NUM_DRIVES;
     state.time.cycle_time_exp     = 1000;        // [us]
-    state.ecat.ethernet_if        = "eno2";
+    state.ecat.ethernet_if        = "eno1";
     state.ecat.num_exposed_slaves = NUM_SLAVES;
     state.ecat.slave_idx[0]       = 1;
     state.ecat.slave_idx[1]       = 3;
@@ -96,7 +96,7 @@ int main()
     state.kelo_msr.pvt_off[3] = 0.0;
 
     state.ecat.name[0]        = "KELO_ECAT_FRD2_PMU1.0";
-    state.ecat.prod_code[0]   = 0x02100101;
+    state.ecat.prod_code[0]   = 0x90001001;
     state.ecat.input_size[0]  = sizeof(state.ecat_comm.pb_msr_pdo);
     state.ecat.output_size[0] = sizeof(state.ecat_comm.pb_cmd_pdo);
     for (int i = 1; i < NUM_DRIVES + 1; i++) {
@@ -122,12 +122,16 @@ int main()
         .input = (void *[NUM_SLAVES]) {
             &state.ecat_comm.pb_msr_pdo,
             &state.ecat_comm.drv_msr_pdo[0],
-            &state.ecat_comm.drv_msr_pdo[1]
+            &state.ecat_comm.drv_msr_pdo[1],
+            &state.ecat_comm.drv_msr_pdo[2],
+            &state.ecat_comm.drv_msr_pdo[3]
         },
         .output = (const void *[NUM_SLAVES]) {
             &state.ecat_comm.pb_cmd_pdo,
             &state.ecat_comm.drv_cmd_pdo[0],
-            &state.ecat_comm.drv_cmd_pdo[1]
+            &state.ecat_comm.drv_cmd_pdo[1],
+            &state.ecat_comm.drv_cmd_pdo[2],
+            &state.ecat_comm.drv_cmd_pdo[3]
         }
     };
 
@@ -210,7 +214,9 @@ int main()
         state.time.cycle_time_msr = timespec_to_usec(&state.time.cycle_end)
                                   - timespec_to_usec(&state.time.cycle_start);
 
-        usleep(state.time.cycle_time_exp - state.time.cycle_time_msr);
+        // threshold for cycle time to be >= 0
+        if (state.time.cycle_time_msr < state.time.cycle_time_exp)
+            usleep(state.time.cycle_time_exp - state.time.cycle_time_msr);
     }
 
     robif2b_kelo_drive_actuator_stop(&wheel_act);

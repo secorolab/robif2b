@@ -1,53 +1,81 @@
-## Setting up robif2b
+# robif2b - building blocks for robotic interfaces
 
-### Dependencies
+## Dependencies
 
- * Simple Open EtherCAT Master (SOEM) for communication via EtherCAT
+* Simple Open EtherCAT Master ([SOEM](https://github.com/OpenEtherCATsociety/SOEM))  - for communication via EtherCAT
+* Kortex API 2.6.0 - for communication with Kinova Gen3 arms
 
-### Building SOEM
+## Workspace
 
-Clone SOEM library in the src folder of robif2b (the current repository) [path is optional]
+1. Create a workspace folder and clone the repository
 
-```bash
-git clone https://github.com/OpenEtherCATsociety/SOEM
-```
+    ```bash
+    mkdir ~/<ws> && cd ~/<ws>
 
-Replace `STATIC` with `SHARED` on line 72 in CMakeList.txt of SOEM
+    mkdir src build install
+    cd src
+    ```
 
-```
-add_library(soem SHARED
-  ...
-```
+## Building dependencies
 
-Build the SOEM library
+### SOEM
 
-```
-cd robif2b
-mkdir install 
-cd src/SOEM
-mkdir build
-cd build
-cmake -DCMAKE_INSTALL_PREFIX=<path to created install folder>/install ..
-make install
-```
+1. Clone the SOEM repository
 
-### Building robif2b
+    ```bash
 
-Before proceeding with the building, make sure the eternet port name is correct in the script. For example, in line 78 of freddy_2_example.c file, modify the value of `state.ecat.ethernet_if` if necessary.
+    git clone https://github.com/OpenEtherCATsociety/SOEM.git
+    ```
 
-Build robif2b library
+2. Replace `STATIC` with `SHARED` on line 72 in CMakeList.txt of SOEM
 
-```bash
-cd robif2b
-mkdir build && cd build
-cmake -DCMAKE_INSTALL_PREFIX=<path to created install folder>/install ..
-cmake -DCMAKE_C_FLAGS="-I<path to created install folder>/install/include" -DENABLE_PACKAGE_REGISTRY=on -DENABLE_ETHERCAT=ON -DENABLE_KELO=ON ..
-make install
-```
+    ``` cmake
+    add_library(soem SHARED
+      ...
+    ```
+
+3. Build the SOEM library
+
+    ``` bash
+    cd ~/<ws>/build
+    # create a build folder
+    mkdir soem && cd soem
+
+    # build the library
+    cmake -DCMAKE_INSTALL_PREFIX=~/<ws>/install -DCMAKE_BUILD_TYPE=Release ../../src/SOEM
+
+    # install the library
+    make install
+    ```
+
+### robif2b
+
+1. Building robif2b
+
+    Before proceeding with the building, make sure the eternet port name is correct in the script. For example, in line 78 of freddy_2_example.c file, modify the value of `state.ecat.ethernet_if` if necessary.
+
+2. Build robif2b library
+
+    ```bash
+    cd ~/<ws>/build
+    # create a build folder
+    mkdir robif2b && cd robif2b
+
+    # build the library
+    cmake -DCMAKE_INSTALL_PREFIX=~/<ws>/install -DCMAKE_PREFIX_PATH=/home/<abs_path_to_ws>/build/ -DCMAKE_C_FLAGS="-I/home/<abs_path_to_ws>/install/include" -DENABLE_ETHERCAT=ON -DENABLE_KELO=ON -DCMAKE_BUILD_TYPE=Release ../../src/robif2b
+
+    # `ENABLE_ETHERCAT=ON` to enable EtherCAT communication
+    # `ENABLE_KELO=ON` to enable Kelo drive communication
+    # `ENABLE_ENABLE_KORTEX=ON` to enable Kinova Kortex drive communication
+    # `ENABLE_KORTEX_API_AUTO_DOWNLOAD=ON` to download the Kortex API automatically
+
+    # install the library
+    make install
+    ```
 
 ### Running example script
 
 ```bash
-cd robif2b
-sudo ./build/src/example/freddy_2_example
+cd ~/<ws>/build
+sudo ./robif2b/src/example/freddy_2_example
 ```
