@@ -27,14 +27,7 @@
     git clone https://github.com/OpenEtherCATsociety/SOEM.git
     ```
 
-2. Replace `STATIC` with `SHARED` on line 72 in CMakeList.txt of SOEM
-
-    ``` cmake
-    add_library(soem SHARED
-      ...
-    ```
-
-3. Build the SOEM library
+2. Build the SOEM library
 
     ``` bash
     cd ~/<ws>/build
@@ -42,7 +35,7 @@
     mkdir soem && cd soem
 
     # build the library
-    cmake -DCMAKE_INSTALL_PREFIX=~/<ws>/install -DCMAKE_BUILD_TYPE=Release ../../src/SOEM
+    cmake -DCMAKE_INSTALL_PREFIX=~/<ws>/install -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=On ../../src/SOEM
 
     # install the library
     make install
