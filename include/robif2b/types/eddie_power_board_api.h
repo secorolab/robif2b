@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0
-#ifndef ROBIF2B_TYPES_FREDDY_2_POWER_BOARD_API_H
-#define ROBIF2B_TYPES_FREDDY_2_POWER_BOARD_API_H
+#ifndef ROBIF2B_TYPES_EDDIE_POWER_BOARD_API_H
+#define ROBIF2B_TYPES_EDDIE_POWER_BOARD_API_H
 
 #include <stdint.h>
 
@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-struct robif2b_freddy_2_power_board_api_msr_pdo {
+struct robif2b_eddie_power_board_api_msr_pdo {
     uint16_t status;      // Status bits
     uint64_t time_stamp;  // EtherCAT timestamp ms
     float current;        // Total current consumption
@@ -19,9 +19,7 @@ struct robif2b_freddy_2_power_board_api_msr_pdo {
     uint32_t param2;      // Generic data, might be used for different purposes
 } __attribute__ ((__packed__));
 
-#define COMMAND_DISABLE 0x00
-
-struct robif2b_freddy_2_power_board_api_cmd_pdo {
+struct robif2b_eddie_power_board_api_cmd_pdo {
     uint16_t shutdown;  // bit 15-8 reserved, bit 7 shutdown, bit 6-0 delay in seconds
     uint32_t command;
 } __attribute__ ((__packed__));

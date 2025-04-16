@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: LGPL-3.0
-#include <robif2b/functions/freddy_2_power_board.h>
+#include <robif2b/functions/eddie_power_board.h>
 
 #include <string.h>
 #include <assert.h>
 
 
-void robif2b_freddy_2_power_board_update(struct robif2b_freddy_2_power_board *b)
+void robif2b_eddie_power_board_update(struct robif2b_eddie_power_board *b)
 {
     assert(b);
     assert(b->msr_pdo);

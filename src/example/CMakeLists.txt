@@ -8,11 +8,15 @@ endif()
 
 if(ENABLE_ETHERCAT)
   if(ENABLE_KELO)
-    add_executable(freddy_2_example freddy_2_example.c)
-    target_link_libraries(freddy_2_example kelo ethercat)
+    add_executable(eddie_example eddie_example.c)
+    target_link_libraries(eddie_example kelo ethercat)
 
     if(ENABLE_INSTALL_TARGETS)
-      install(TARGETS freddy_2_example DESTINATION bin/${PROJECT_NAME})
+      set_target_properties(eddie_example PROPERTIES
+        INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}"
+        INSTALL_RPATH_USE_LINK_PATH TRUE
+      )
+      install(TARGETS eddie_example DESTINATION bin/${PROJECT_NAME})
     endif()
   endif()
 endif()

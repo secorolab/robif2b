@@ -6,7 +6,7 @@
 
 #include <robif2b/functions/ethercat.h>
 #include <robif2b/functions/kelo_drive.h>
-#include <robif2b/functions/freddy_2_power_board.h>
+#include <robif2b/functions/eddie_power_board.h>
 
 
 static long timespec_to_usec(const struct timespec *t) {
@@ -30,8 +30,8 @@ static struct {
     struct {
         struct robif2b_kelo_drive_api_msr_pdo drv_msr_pdo[NUM_DRIVES];
         struct robif2b_kelo_drive_api_cmd_pdo drv_cmd_pdo[NUM_DRIVES];
-        struct robif2b_freddy_2_power_board_api_msr_pdo pb_msr_pdo;
-        struct robif2b_freddy_2_power_board_api_cmd_pdo pb_cmd_pdo;
+        struct robif2b_eddie_power_board_api_msr_pdo pb_msr_pdo;
+        struct robif2b_eddie_power_board_api_cmd_pdo pb_cmd_pdo;
     } ecat_comm;
     struct {
         const char   *ethernet_if;
@@ -163,7 +163,7 @@ int main()
         .trq_const   = &state.kelo_cmd.trq_const[0]
     };
 
-    struct robif2b_freddy_2_power_board power_board = {
+    struct robif2b_eddie_power_board power_board = {
         .msr_pdo     = &state.ecat_comm.pb_msr_pdo,
         .cmd_pdo     = &state.ecat_comm.pb_cmd_pdo,
         .time_stamp = &state.kelo_msr.time_stamp,
@@ -186,9 +186,9 @@ int main()
 
     // set the power board command to enable arms
     power_board.cmd_pdo->shutdown = 0;
-    power_board.cmd_pdo->command = 0b00100000; // enable arms power
+    power_board.cmd_pdo->command = 0b00100000; // enable arms power while base is powered on
 
-    robif2b_freddy_2_power_board_update(&power_board);
+    robif2b_eddie_power_board_update(&power_board);
 
     while (true) {
         clock_gettime(CLOCK_MONOTONIC, &state.time.cycle_start);
@@ -199,7 +199,7 @@ int main()
         robif2b_kelo_drive_encoder_update(&drive_enc);
         robif2b_kelo_drive_imu_update(&imu);
         robif2b_kelo_drive_actuator_update(&wheel_act);
-        robif2b_freddy_2_power_board_update(&power_board);
+        robif2b_eddie_power_board_update(&power_board);
 
         for (int i = 0; i < NUM_DRIVES; i++) {
             printf("drive [id=%i, conn=%i]: "
