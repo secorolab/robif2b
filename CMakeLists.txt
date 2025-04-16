@@ -4,9 +4,11 @@ project(robif2b)
 option(ENABLE_PACKAGE_REGISTRY "Add this package to CMake's package registry" Off)
 option(ENABLE_ETHERCAT "Build EtherCat interface" Off)
 option(ENABLE_KORTEX "Build Kinova Kortex interface" Off)
+option(ENABLE_KORTEX_API_AUTO_DOWNLOAD "Auto download Kortex API library" Off)
 option(ENABLE_KELO "Build Kelo interface" Off)
 option(ENABLE_UBX "Build UBX blocks" Off)
 option(ENABLE_DOC "Build documentation" Off)
+option(ENABLE_INSTALL_TARGETS "Install targets" Off)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
