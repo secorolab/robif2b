@@ -181,14 +181,14 @@ int main()
     robif2b_ethercat_start(&ecat);
     if (state.ecat.error_code < 0) return -1;
 
-    robif2b_ethercat_update(&ecat);
-    if (state.ecat.error_code < 0) return -1;
-
     // set the power board command to enable arms
     power_board.cmd_pdo->shutdown = 0;
     power_board.cmd_pdo->command = 0b00100000; // enable arms power while base is powered on
 
     robif2b_eddie_power_board_update(&power_board);
+
+    robif2b_ethercat_update(&ecat);
+    if (state.ecat.error_code < 0) return -1;
 
     while (true) {
         clock_gettime(CLOCK_MONOTONIC, &state.time.cycle_start);
