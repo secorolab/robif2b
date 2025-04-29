@@ -98,10 +98,10 @@ void robif2b_kelo_drive_actuator_update(struct robif2b_kelo_drive_actuator *b)
                                           / b->trq_const[i * 2 + 0];
                 b->cmd_pdo[i].setpoint2 = b->act_trq_cmd[i * 2 + 1]
                                           / b->trq_const[i * 2 + 1];
-                b->cmd_pdo[i].limit1_p  = 0.0; // Controller does not seem to
-                b->cmd_pdo[i].limit1_n  = 0.0; // use those limits in torque
-                b->cmd_pdo[i].limit2_p  = 0.0; // control mode
-                b->cmd_pdo[i].limit2_n  = 0.0;
+                b->cmd_pdo[i].limit1_p  =  20.0;
+                b->cmd_pdo[i].limit1_n  = -20.0;
+                b->cmd_pdo[i].limit2_p  =  20.0;
+                b->cmd_pdo[i].limit2_n  = -20.0;
             break;
 
             case ROBIF2B_CTRL_MODE_CURRENT:

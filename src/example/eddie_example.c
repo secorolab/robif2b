@@ -193,6 +193,9 @@ int main()
     while (true) {
         clock_gettime(CLOCK_MONOTONIC, &state.time.cycle_start);
 
+        state.kelo_cmd.trq[0] = 1.0;
+        state.kelo_cmd.trq[1] = -1.0;
+
         robif2b_ethercat_update(&ecat);
         if (state.ecat.error_code < 0) return -1;
 
