@@ -21,6 +21,12 @@ int main(int argc, char **argv)
     double cur_cmd[] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
     double imu_ang_vel_msr[] = { 0.0, 0.0, 0.0 };
     double imu_lin_acc_msr[] = { 0.0, 0.0, 0.0 };
+    float gripper_pos_msr[] = { 0.0 };
+    float gripper_vel_msr[] = { 0.0 };
+    float gripper_cur_msr[] = { 0.0 };
+    float gripper_pos_cmd[] = { 50.0 };
+    float gripper_vel_cmd[] = { 20.0 };
+    float gripper_frc_cmd[] = { 10.0 };
 
     struct robif2b_kinova_gen3_nbx rob = {
         // Configuration
@@ -31,6 +37,7 @@ int main(int argc, char **argv)
         .conf.password           = "admin",
         .conf.session_timeout    = 60000,
         .conf.connection_timeout = 2000,
+        .conf.use_gripper        = true,
 
         // Connections
         .cycle_time = &cycle_time,
@@ -45,6 +52,12 @@ int main(int argc, char **argv)
         .act_cur_cmd = cur_cmd,
         .imu_ang_vel_msr = imu_ang_vel_msr,
         .imu_lin_acc_msr = imu_lin_acc_msr,
+        .gripper_pos_msr = gripper_pos_msr,
+        .gripper_vel_msr = gripper_vel_msr,
+        .gripper_cur_msr = gripper_cur_msr,
+        .gripper_pos_cmd = gripper_pos_cmd,
+        .gripper_vel_cmd = gripper_vel_cmd,
+        .gripper_frc_cmd = gripper_frc_cmd,
         .success = &success
     };
 

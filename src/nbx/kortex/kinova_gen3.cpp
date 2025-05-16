@@ -43,6 +43,16 @@ void publish_measurement(struct robif2b_kinova_gen3_nbx *b)
     b->imu_lin_acc_msr[0] = comm->feedback.base().imu_acceleration_x();
     b->imu_lin_acc_msr[1] = comm->feedback.base().imu_acceleration_y();
     b->imu_lin_acc_msr[2] = comm->feedback.base().imu_acceleration_z();
+
+    if (b->conf.use_gripper) {
+        assert(b->gripper_pos_msr);
+        assert(b->gripper_vel_msr);
+        assert(b->gripper_cur_msr);
+        
+        b->gripper_pos_msr[0] = comm->feedback.interconnect().gripper_feedback().motor()[0].position();
+        b->gripper_vel_msr[0] = comm->feedback.interconnect().gripper_feedback().motor()[0].velocity();
+        b->gripper_cur_msr[0] = comm->feedback.interconnect().gripper_feedback().motor()[0].current_motor();
+    }
 }
 
 
@@ -163,6 +173,11 @@ void robif2b_kinova_gen3_start(struct robif2b_kinova_gen3_nbx *b)
     comm->servoing_mode.set_servoing_mode(k_api::Base::ServoingMode::LOW_LEVEL_SERVOING);
     comm->base->SetServoingMode(comm->servoing_mode);
 
+    if (b->conf.use_gripper) {
+        comm->command.mutable_interconnect()->mutable_command_id()->set_identifier(0);
+        comm->gripper_command = comm->command.mutable_interconnect()->mutable_gripper_command()->add_motor_cmd();
+    }
+
     *b->success = true;
 }
 
@@ -212,7 +227,6 @@ void robif2b_kinova_gen3_update(struct robif2b_kinova_gen3_nbx *b)
     assert(b->cycle_time);
 
     robif2b_kinova_gen3_comm *comm = b->comm;
-
 
     // Switch control mode
     if (*b->ctrl_mode != b->ctrl_mode_prev) {
@@ -278,6 +292,16 @@ void robif2b_kinova_gen3_update(struct robif2b_kinova_gen3_nbx *b)
 
         // Unconditionally set the position command to avoid too large deviations
         comm->command.mutable_actuators(i)->set_position(RAD_TO_DEG(pos));
+    }
+
+    if (b->conf.use_gripper) {
+        assert(b->gripper_pos_cmd);
+        assert(b->gripper_vel_cmd);
+        assert(b->gripper_frc_cmd);
+
+        comm->gripper_command->set_force(b->gripper_frc_cmd[0]);
+        comm->gripper_command->set_velocity(b->gripper_vel_cmd[0]);
+        comm->gripper_command->set_position(b->gripper_pos_cmd[0]);
     }
 
     comm->feedback = comm->base_cyclic->Refresh(comm->command, 0);
