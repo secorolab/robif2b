@@ -169,8 +169,21 @@ void robif2b_kinova_gen3_start(struct robif2b_kinova_gen3_nbx *b)
 
     robif2b_kinova_gen3_comm *comm = b->comm;
 
-    // Set the base in low-level servoing mode
-    comm->servoing_mode.set_servoing_mode(k_api::Base::ServoingMode::LOW_LEVEL_SERVOING);
+    switch (*b->servoing_mode) {
+        case ROBIF2B_KINOVA_SERVOING_LOW_LEVEL:
+            // Set the base in low-level servoing mode
+            comm->servoing_mode.set_servoing_mode(k_api::Base::ServoingMode::LOW_LEVEL_SERVOING);
+            break;
+        case ROBIF2B_KINOVA_SERVOING_SINGLE_LEVEL:
+            // Set the base in single-level servoing mode
+            comm->servoing_mode.set_servoing_mode(k_api::Base::ServoingMode::SINGLE_LEVEL_SERVOING);
+            break;
+        default:
+            robif2b_kinova_gen3_stop(b);
+            *b->success = false;
+            break;
+    }
+    
     comm->base->SetServoingMode(comm->servoing_mode);
 
     if (b->conf.use_gripper) {
@@ -228,83 +241,155 @@ void robif2b_kinova_gen3_update(struct robif2b_kinova_gen3_nbx *b)
 
     robif2b_kinova_gen3_comm *comm = b->comm;
 
-    // Switch control mode
-    if (*b->ctrl_mode != b->ctrl_mode_prev) {
-        k_api::ActuatorConfig::ControlModeInformation ctrl_mode_msg = k_api::ActuatorConfig::ControlModeInformation();
+    if (*b->servoing_mode == ROBIF2B_KINOVA_SERVOING_LOW_LEVEL) {
 
-        switch (*b->ctrl_mode) {
-            case ROBIF2B_CTRL_MODE_POSITION:
-            case ROBIF2B_CTRL_MODE_VELOCITY:
-                ctrl_mode_msg.set_control_mode(k_api::ActuatorConfig::ControlMode::POSITION);
-            break;
+        // Switch control mode
+        if (*b->ctrl_mode != b->ctrl_mode_prev) {
+            k_api::ActuatorConfig::ControlModeInformation ctrl_mode_msg = k_api::ActuatorConfig::ControlModeInformation();
 
-            case ROBIF2B_CTRL_MODE_FORCE:
-                ctrl_mode_msg.set_control_mode(k_api::ActuatorConfig::ControlMode::TORQUE);
-            break;
+            switch (*b->ctrl_mode) {
+                case ROBIF2B_CTRL_MODE_POSITION:
+                case ROBIF2B_CTRL_MODE_VELOCITY:
+                    ctrl_mode_msg.set_control_mode(k_api::ActuatorConfig::ControlMode::POSITION);
+                break;
 
-            case ROBIF2B_CTRL_MODE_CURRENT:
-                ctrl_mode_msg.set_control_mode(k_api::ActuatorConfig::ControlMode::CURRENT);
-            break;
+                case ROBIF2B_CTRL_MODE_FORCE:
+                    ctrl_mode_msg.set_control_mode(k_api::ActuatorConfig::ControlMode::TORQUE);
+                break;
 
-            default:
-                robif2b_kinova_gen3_stop(b);
-                *b->success = false;
-                return;
+                case ROBIF2B_CTRL_MODE_CURRENT:
+                    ctrl_mode_msg.set_control_mode(k_api::ActuatorConfig::ControlMode::CURRENT);
+                break;
+
+                default:
+                    robif2b_kinova_gen3_stop(b);
+                    *b->success = false;
+                    return;
+            }
+
+            for (int i = 0; i < ROBIF2B_KINOVA_GEN3_NR_JOINTS; i++) {
+                // Note that the actuator IDs start at 1
+                comm->actuator_config->SetControlMode(ctrl_mode_msg, i + 1);
+            }
         }
+
+
+        // Incrementing identifier ensures actuators can reject out of time frames
+        comm->command.set_frame_id(comm->command.frame_id() + 1);
+        if (comm->command.frame_id() > 65535) comm->command.set_frame_id(0);
 
         for (int i = 0; i < ROBIF2B_KINOVA_GEN3_NR_JOINTS; i++) {
-            // Note that the actuator IDs start at 1
-            comm->actuator_config->SetControlMode(ctrl_mode_msg, i + 1);
-        }
-    }
+            comm->command.mutable_actuators(i)->set_command_id(comm->command.frame_id());
 
+            double pos = DEG_TO_RAD(comm->feedback.actuators(i).position());
 
-    // Incrementing identifier ensures actuators can reject out of time frames
-    comm->command.set_frame_id(comm->command.frame_id() + 1);
-    if (comm->command.frame_id() > 65535) comm->command.set_frame_id(0);
+            switch (*b->ctrl_mode) {
+                case ROBIF2B_CTRL_MODE_POSITION:
+                    assert(b->jnt_pos_cmd);
+                    pos = b->jnt_pos_cmd[i];
+                break;
 
-    for (int i = 0; i < ROBIF2B_KINOVA_GEN3_NR_JOINTS; i++) {
-        comm->command.mutable_actuators(i)->set_command_id(comm->command.frame_id());
+                case ROBIF2B_CTRL_MODE_VELOCITY:
+                    assert(b->jnt_vel_cmd);
+                    pos += b->jnt_vel_cmd[i] * (*b->cycle_time);
+                break;
 
-        double pos = DEG_TO_RAD(comm->feedback.actuators(i).position());
+                case ROBIF2B_CTRL_MODE_FORCE:
+                    assert(b->jnt_trq_cmd);
+                    comm->command.mutable_actuators(i)->set_torque_joint(b->jnt_trq_cmd[i]);
+                break;
 
-        switch (*b->ctrl_mode) {
-            case ROBIF2B_CTRL_MODE_POSITION:
-                assert(b->jnt_pos_cmd);
-                pos = b->jnt_pos_cmd[i];
-            break;
+                case ROBIF2B_CTRL_MODE_CURRENT:
+                    assert(b->act_cur_cmd);
+                    comm->command.mutable_actuators(i)->set_current_motor(b->act_cur_cmd[i]);
+                break;
+            }
 
-            case ROBIF2B_CTRL_MODE_VELOCITY:
-                assert(b->jnt_vel_cmd);
-                pos += b->jnt_vel_cmd[i] * (*b->cycle_time);
-            break;
-
-            case ROBIF2B_CTRL_MODE_FORCE:
-                assert(b->jnt_trq_cmd);
-                comm->command.mutable_actuators(i)->set_torque_joint(b->jnt_trq_cmd[i]);
-            break;
-
-            case ROBIF2B_CTRL_MODE_CURRENT:
-                assert(b->act_cur_cmd);
-                comm->command.mutable_actuators(i)->set_current_motor(b->act_cur_cmd[i]);
-            break;
+            // Unconditionally set the position command to avoid too large deviations
+            comm->command.mutable_actuators(i)->set_position(RAD_TO_DEG(pos));
         }
 
-        // Unconditionally set the position command to avoid too large deviations
-        comm->command.mutable_actuators(i)->set_position(RAD_TO_DEG(pos));
+        if (b->conf.use_gripper) {
+            assert(b->gripper_pos_cmd);
+            assert(b->gripper_vel_cmd);
+            assert(b->gripper_frc_cmd);
+
+            comm->gripper_command->set_force(b->gripper_frc_cmd[0]);
+            comm->gripper_command->set_velocity(b->gripper_vel_cmd[0]);
+            comm->gripper_command->set_position(b->gripper_pos_cmd[0]);
+        }
+
+        comm->feedback = comm->base_cyclic->Refresh(comm->command, 0);
+    } else {
+        robif2b_kionva_gen3_cartesian_command *cart_cmd = b->cartesian_cmd;
+        assert(cart_cmd);
+
+        if (*b->ctrl_mode != b->ctrl_mode_prev) {
+            
+            k_api::Common::CartesianReferenceFrame ref_frame;
+
+            switch (cart_cmd->reference_frame) {
+                case ROBIF2B_KINOVA_CARTESIAN_REFERENCE_FRAME_BASE:
+                    ref_frame = k_api::Common::CARTESIAN_REFERENCE_FRAME_BASE;
+                break;
+                case ROBIF2B_KINOVA_CARTESIAN_REFERENCE_FRAME_TOOL:
+                    ref_frame = k_api::Common::CARTESIAN_REFERENCE_FRAME_TOOL;
+                break;
+                case ROBIF2B_KINOVA_CARTESIAN_REFERENCE_FRAME_MIXED:
+                    ref_frame = k_api::Common::CARTESIAN_REFERENCE_FRAME_MIXED;
+                break;
+                default:
+                    robif2b_kinova_gen3_stop(b);
+                    *b->success = false;
+                    return;
+            }
+
+            switch (*b->ctrl_mode) {
+                case ROBIF2B_CTRL_MODE_VELOCITY: {
+                    auto command = k_api::Base::TwistCommand();
+                    command.set_reference_frame(ref_frame);
+                    command.set_duration(cart_cmd->duration);
+
+                    auto twist = command.mutable_twist();
+                    twist->set_linear_x(cart_cmd->twist[0]);
+                    twist->set_linear_y(cart_cmd->twist[1]);
+                    twist->set_linear_z(cart_cmd->twist[2]);
+                    twist->set_angular_x(cart_cmd->twist[3]);
+                    twist->set_angular_y(cart_cmd->twist[4]);
+                    twist->set_angular_z(cart_cmd->twist[5]);
+
+                    comm->base->SendTwistCommand(command);
+                }
+                break;
+                case ROBIF2B_CTRL_MODE_FORCE: {
+                    auto command = k_api::Base::WrenchCommand();
+                    command.set_reference_frame(ref_frame);
+                    command.set_duration(cart_cmd->duration);
+                    
+                    auto wrench = command.mutable_wrench();
+                    wrench->set_force_x(cart_cmd->wrench[0]);
+                    wrench->set_force_y(cart_cmd->wrench[1]);
+                    wrench->set_force_z(cart_cmd->wrench[2]);
+                    wrench->set_torque_x(cart_cmd->wrench[3]);
+                    wrench->set_torque_y(cart_cmd->wrench[4]);
+                    wrench->set_torque_z(cart_cmd->wrench[5]);
+
+                    comm->base->SendWrenchCommand(command);
+                }
+                break;
+                default:
+                    robif2b_kinova_gen3_stop(b);
+                    *b->success = false;
+                    return;
+            }
+        }
+        
+        comm->feedback = comm->base_cyclic->RefreshFeedback(0);
+
+        *b->success = true;
+        return;
     }
 
-    if (b->conf.use_gripper) {
-        assert(b->gripper_pos_cmd);
-        assert(b->gripper_vel_cmd);
-        assert(b->gripper_frc_cmd);
-
-        comm->gripper_command->set_force(b->gripper_frc_cmd[0]);
-        comm->gripper_command->set_velocity(b->gripper_vel_cmd[0]);
-        comm->gripper_command->set_position(b->gripper_pos_cmd[0]);
-    }
-
-    comm->feedback = comm->base_cyclic->Refresh(comm->command, 0);
     publish_measurement(b);
 
     b->ctrl_mode_prev = *b->ctrl_mode;

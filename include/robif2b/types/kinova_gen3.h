@@ -3,6 +3,7 @@
 #define ROBIF2B_TYPES_KINOVA_GEN3_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include <robif2b/types/control_mode.h>
 
@@ -12,6 +13,19 @@ extern "C" {
 #endif
 
 #define ROBIF2B_KINOVA_GEN3_NR_JOINTS 7
+
+enum robif2b_kinova_servoing_mode
+{
+    ROBIF2B_KINOVA_SERVOING_LOW_LEVEL = 0,
+    ROBIF2B_KINOVA_SERVOING_SINGLE_LEVEL = 1
+};
+
+enum robif2b_kinova_cartesian_reference_frame
+{
+    ROBIF2B_KINOVA_CARTESIAN_REFERENCE_FRAME_BASE = 0,
+    ROBIF2B_KINOVA_CARTESIAN_REFERENCE_FRAME_TOOL = 1,
+    ROBIF2B_KINOVA_CARTESIAN_REFERENCE_FRAME_MIXED = 2
+};
 
 
 struct robif2b_kinova_gen3_config
@@ -26,6 +40,13 @@ struct robif2b_kinova_gen3_config
     bool use_gripper;           // robotiq gripper
 };
 
+struct robif2b_kionva_gen3_cartesian_command
+{
+    float twist[6];       // [vx, vy, vz, wx, wy, wz]
+    float wrench[6];      // [N, N, N, Nm, Nm, Nm]
+    uint32_t duration;       // [s]
+    enum robif2b_kinova_cartesian_reference_frame reference_frame;
+};
 
 struct robif2b_kinova_gen3_comm;
 
@@ -36,6 +57,7 @@ struct robif2b_kinova_gen3_nbx
     struct robif2b_kinova_gen3_config conf;
     // Ports
     const double *cycle_time;               // [s]
+    enum robif2b_kinova_servoing_mode *servoing_mode;
     enum robif2b_ctrl_mode *ctrl_mode;
     double *jnt_pos_msr;                    // [rad]
     double *jnt_vel_msr;                    // [rad/s]
@@ -53,6 +75,7 @@ struct robif2b_kinova_gen3_nbx
     float *gripper_pos_cmd;                  // [%]
     float *gripper_vel_cmd;                  // [%]
     float *gripper_frc_cmd;                  // [%]
+    struct robif2b_kionva_gen3_cartesian_command *cartesian_cmd;
     bool *success;
     // Internal state
     struct robif2b_kinova_gen3_comm *comm;
