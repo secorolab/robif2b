@@ -40,11 +40,11 @@ struct robif2b_kinova_gen3_config
     bool use_gripper;           // robotiq gripper
 };
 
-struct robif2b_kionva_gen3_cartesian_command
+struct robif2b_kionva_gen3_cart_cmd
 {
-    float twist[6];       // [vx, vy, vz, wx, wy, wz]
-    float wrench[6];      // [N, N, N, Nm, Nm, Nm]
-    uint32_t duration;       // [s]
+    float *twist;       // [vx, vy, vz, wx, wy, wz]
+    float *wrench;      // [N, N, N, Nm, Nm, Nm]
+    uint32_t duration;  // [s]
     enum robif2b_kinova_cartesian_reference_frame reference_frame;
 };
 
@@ -75,7 +75,7 @@ struct robif2b_kinova_gen3_nbx
     float *gripper_pos_cmd;                  // [%]
     float *gripper_vel_cmd;                  // [%]
     float *gripper_frc_cmd;                  // [%]
-    struct robif2b_kionva_gen3_cartesian_command *cartesian_cmd;
+    struct robif2b_kionva_gen3_cart_cmd cartesian_cmd;
     bool *success;
     // Internal state
     struct robif2b_kinova_gen3_comm *comm;
