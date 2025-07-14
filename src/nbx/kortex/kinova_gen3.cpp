@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0
+#include "robif2b/types/kinova_gen3.h"
 #include <robif2b/functions/kinova_gen3.h>
+#include "ActuatorConfig.pb.h"
+#include "Base.pb.h"
 #include "kinova_gen3_comm.hpp"
 
 #include <cmath>
@@ -43,16 +46,20 @@ void publish_measurement(struct robif2b_kinova_gen3_nbx *b)
     b->imu_lin_acc_msr[0] = comm->feedback.base().imu_acceleration_x();
     b->imu_lin_acc_msr[1] = comm->feedback.base().imu_acceleration_y();
     b->imu_lin_acc_msr[2] = comm->feedback.base().imu_acceleration_z();
+}
 
-    if (b->conf.use_gripper) {
-        assert(b->gripper_pos_msr);
-        assert(b->gripper_vel_msr);
-        assert(b->gripper_cur_msr);
-        
-        b->gripper_pos_msr[0] = comm->feedback.interconnect().gripper_feedback().motor()[0].position();
-        b->gripper_vel_msr[0] = comm->feedback.interconnect().gripper_feedback().motor()[0].velocity();
-        b->gripper_cur_msr[0] = comm->feedback.interconnect().gripper_feedback().motor()[0].current_motor();
-    }
+
+void publish_gripper_measurement(struct robif2b_kg3_robotiq_gripper_nbx *b)
+{
+    assert(b->gripper_pos_msr);
+    assert(b->gripper_vel_msr);
+    assert(b->gripper_cur_msr);
+    
+    robif2b_kinova_gen3_comm *comm = b->comm; 
+
+    b->gripper_pos_msr[0] = comm->feedback.interconnect().gripper_feedback().motor()[0].position();
+    b->gripper_vel_msr[0] = comm->feedback.interconnect().gripper_feedback().motor()[0].velocity();
+    b->gripper_cur_msr[0] = comm->feedback.interconnect().gripper_feedback().motor()[0].current_motor();
 }
 
 
@@ -127,6 +134,14 @@ void robif2b_kinova_gen3_configure(struct robif2b_kinova_gen3_nbx *b)
 }
 
 
+void robif2b_kg3_robotiq_gripper_configure(robif2b_kg3_robotiq_gripper_nbx *b, robif2b_kinova_gen3_comm *comm)
+{
+    b->comm = comm;
+
+    *b->success = false;
+}
+
+
 void robif2b_kinova_gen3_shutdown(struct robif2b_kinova_gen3_nbx *b)
 {
     assert(b);
@@ -186,10 +201,47 @@ void robif2b_kinova_gen3_start(struct robif2b_kinova_gen3_nbx *b)
     
     comm->base->SetServoingMode(comm->servoing_mode);
 
-    if (b->conf.use_gripper) {
-        comm->command.mutable_interconnect()->mutable_command_id()->set_identifier(0);
-        comm->gripper_command = comm->command.mutable_interconnect()->mutable_gripper_command()->add_motor_cmd();
+    *b->success = true;
+}
+
+
+void robif2b_kg3_robotiq_gripper_start(struct robif2b_kg3_robotiq_gripper_nbx *b)
+{
+    assert(b);
+    assert(b->comm);
+    
+    robif2b_kinova_gen3_comm *comm = b->comm;
+
+    k_api::Base::ServoingModeInformation s_mode_info = comm->base->GetServoingMode();
+
+    if (s_mode_info.servoing_mode() != k_api::Base::ServoingMode::LOW_LEVEL_SERVOING)
+    {
+        *b->success = false;
+        return;
     }
+
+    comm->command.mutable_interconnect()->mutable_command_id()->set_identifier(0);
+    comm->gripper_command = comm->command.mutable_interconnect()->mutable_gripper_command()->add_motor_cmd();
+
+    *b->success = true;
+}
+
+
+void robif2b_kg3_robotiq_gripper_stop(struct robif2b_kg3_robotiq_gripper_nbx *b)
+{
+    assert(b);
+    assert(b->success);
+    assert(b->comm);
+
+    robif2b_kinova_gen3_comm *comm = b->comm;
+
+    comm->gripper_command->clear_position();
+    comm->gripper_command->clear_velocity();
+    comm->gripper_command->clear_force();
+    comm->gripper_command->clear_motor_id();
+
+    comm->command.mutable_interconnect()->mutable_command_id()->clear_identifier();
+    comm->command.mutable_interconnect()->mutable_gripper_command()->clear_motor_cmd();
 
     *b->success = true;
 }
@@ -202,6 +254,15 @@ void robif2b_kinova_gen3_stop(struct robif2b_kinova_gen3_nbx *b)
     assert(b->comm);
 
     robif2b_kinova_gen3_comm *comm = b->comm;
+
+    // set the control mode to position
+    k_api::ActuatorConfig::ControlModeInformation ctrl_mode_msg = k_api::ActuatorConfig::ControlModeInformation();
+    ctrl_mode_msg.set_control_mode(k_api::ActuatorConfig::ControlMode::POSITION);
+
+    for (int i = 0; i < ROBIF2B_KINOVA_GEN3_NR_JOINTS; i++) {
+        // Note that the actuator IDs start at 1
+        comm->actuator_config->SetControlMode(ctrl_mode_msg, i + 1);
+    }
 
     // Set the servoing mode back to Single Level
     comm->servoing_mode.set_servoing_mode(k_api::Base::ServoingMode::SINGLE_LEVEL_SERVOING);
@@ -241,154 +302,74 @@ void robif2b_kinova_gen3_update(struct robif2b_kinova_gen3_nbx *b)
 
     robif2b_kinova_gen3_comm *comm = b->comm;
 
-    if (*b->servoing_mode == ROBIF2B_KINOVA_SERVOING_LOW_LEVEL) {
 
-        // Switch control mode
-        if (*b->ctrl_mode != b->ctrl_mode_prev) {
-            k_api::ActuatorConfig::ControlModeInformation ctrl_mode_msg = k_api::ActuatorConfig::ControlModeInformation();
+    // Switch control mode
+    if (*b->ctrl_mode != b->ctrl_mode_prev) {
+        k_api::ActuatorConfig::ControlModeInformation ctrl_mode_msg = k_api::ActuatorConfig::ControlModeInformation();
 
-            switch (*b->ctrl_mode) {
-                case ROBIF2B_CTRL_MODE_POSITION:
-                case ROBIF2B_CTRL_MODE_VELOCITY:
-                    ctrl_mode_msg.set_control_mode(k_api::ActuatorConfig::ControlMode::POSITION);
-                break;
+        switch (*b->ctrl_mode) {
+            case ROBIF2B_CTRL_MODE_POSITION:
+            case ROBIF2B_CTRL_MODE_VELOCITY:
+                ctrl_mode_msg.set_control_mode(k_api::ActuatorConfig::ControlMode::POSITION);
+            break;
 
-                case ROBIF2B_CTRL_MODE_FORCE:
-                    ctrl_mode_msg.set_control_mode(k_api::ActuatorConfig::ControlMode::TORQUE);
-                break;
+            case ROBIF2B_CTRL_MODE_FORCE:
+                ctrl_mode_msg.set_control_mode(k_api::ActuatorConfig::ControlMode::TORQUE);
+            break;
 
-                case ROBIF2B_CTRL_MODE_CURRENT:
-                    ctrl_mode_msg.set_control_mode(k_api::ActuatorConfig::ControlMode::CURRENT);
-                break;
+            case ROBIF2B_CTRL_MODE_CURRENT:
+                ctrl_mode_msg.set_control_mode(k_api::ActuatorConfig::ControlMode::CURRENT);
+            break;
 
-                default:
-                    robif2b_kinova_gen3_stop(b);
-                    *b->success = false;
-                    return;
-            }
-
-            for (int i = 0; i < ROBIF2B_KINOVA_GEN3_NR_JOINTS; i++) {
-                // Note that the actuator IDs start at 1
-                comm->actuator_config->SetControlMode(ctrl_mode_msg, i + 1);
-            }
+            default:
+                robif2b_kinova_gen3_stop(b);
+                *b->success = false;
+                return;
         }
-
-
-        // Incrementing identifier ensures actuators can reject out of time frames
-        comm->command.set_frame_id(comm->command.frame_id() + 1);
-        if (comm->command.frame_id() > 65535) comm->command.set_frame_id(0);
 
         for (int i = 0; i < ROBIF2B_KINOVA_GEN3_NR_JOINTS; i++) {
-            comm->command.mutable_actuators(i)->set_command_id(comm->command.frame_id());
-
-            double pos = DEG_TO_RAD(comm->feedback.actuators(i).position());
-
-            switch (*b->ctrl_mode) {
-                case ROBIF2B_CTRL_MODE_POSITION:
-                    assert(b->jnt_pos_cmd);
-                    pos = b->jnt_pos_cmd[i];
-                break;
-
-                case ROBIF2B_CTRL_MODE_VELOCITY:
-                    assert(b->jnt_vel_cmd);
-                    pos += b->jnt_vel_cmd[i] * (*b->cycle_time);
-                break;
-
-                case ROBIF2B_CTRL_MODE_FORCE:
-                    assert(b->jnt_trq_cmd);
-                    comm->command.mutable_actuators(i)->set_torque_joint(b->jnt_trq_cmd[i]);
-                break;
-
-                case ROBIF2B_CTRL_MODE_CURRENT:
-                    assert(b->act_cur_cmd);
-                    comm->command.mutable_actuators(i)->set_current_motor(b->act_cur_cmd[i]);
-                break;
-            }
-
-            // Unconditionally set the position command to avoid too large deviations
-            comm->command.mutable_actuators(i)->set_position(RAD_TO_DEG(pos));
+            // Note that the actuator IDs start at 1
+            comm->actuator_config->SetControlMode(ctrl_mode_msg, i + 1);
         }
-
-        if (b->conf.use_gripper) {
-            assert(b->gripper_pos_cmd);
-            assert(b->gripper_vel_cmd);
-            assert(b->gripper_frc_cmd);
-
-            comm->gripper_command->set_force(b->gripper_frc_cmd[0]);
-            comm->gripper_command->set_velocity(b->gripper_vel_cmd[0]);
-            comm->gripper_command->set_position(b->gripper_pos_cmd[0]);
-        }
-
-        comm->feedback = comm->base_cyclic->Refresh(comm->command, 0);
-    } else {
-        robif2b_kionva_gen3_cartesian_command *cart_cmd = b->cartesian_cmd;
-        assert(cart_cmd);
-
-        if (*b->ctrl_mode != b->ctrl_mode_prev) {
-            
-            k_api::Common::CartesianReferenceFrame ref_frame;
-
-            switch (cart_cmd->reference_frame) {
-                case ROBIF2B_KINOVA_CARTESIAN_REFERENCE_FRAME_BASE:
-                    ref_frame = k_api::Common::CARTESIAN_REFERENCE_FRAME_BASE;
-                break;
-                case ROBIF2B_KINOVA_CARTESIAN_REFERENCE_FRAME_TOOL:
-                    ref_frame = k_api::Common::CARTESIAN_REFERENCE_FRAME_TOOL;
-                break;
-                case ROBIF2B_KINOVA_CARTESIAN_REFERENCE_FRAME_MIXED:
-                    ref_frame = k_api::Common::CARTESIAN_REFERENCE_FRAME_MIXED;
-                break;
-                default:
-                    robif2b_kinova_gen3_stop(b);
-                    *b->success = false;
-                    return;
-            }
-
-            switch (*b->ctrl_mode) {
-                case ROBIF2B_CTRL_MODE_VELOCITY: {
-                    auto command = k_api::Base::TwistCommand();
-                    command.set_reference_frame(ref_frame);
-                    command.set_duration(cart_cmd->duration);
-
-                    auto twist = command.mutable_twist();
-                    twist->set_linear_x(cart_cmd->twist[0]);
-                    twist->set_linear_y(cart_cmd->twist[1]);
-                    twist->set_linear_z(cart_cmd->twist[2]);
-                    twist->set_angular_x(cart_cmd->twist[3]);
-                    twist->set_angular_y(cart_cmd->twist[4]);
-                    twist->set_angular_z(cart_cmd->twist[5]);
-
-                    comm->base->SendTwistCommand(command);
-                }
-                break;
-                case ROBIF2B_CTRL_MODE_FORCE: {
-                    auto command = k_api::Base::WrenchCommand();
-                    command.set_reference_frame(ref_frame);
-                    command.set_duration(cart_cmd->duration);
-                    
-                    auto wrench = command.mutable_wrench();
-                    wrench->set_force_x(cart_cmd->wrench[0]);
-                    wrench->set_force_y(cart_cmd->wrench[1]);
-                    wrench->set_force_z(cart_cmd->wrench[2]);
-                    wrench->set_torque_x(cart_cmd->wrench[3]);
-                    wrench->set_torque_y(cart_cmd->wrench[4]);
-                    wrench->set_torque_z(cart_cmd->wrench[5]);
-
-                    comm->base->SendWrenchCommand(command);
-                }
-                break;
-                default:
-                    robif2b_kinova_gen3_stop(b);
-                    *b->success = false;
-                    return;
-            }
-        }
-        
-        comm->feedback = comm->base_cyclic->RefreshFeedback(0);
-
-        *b->success = true;
-        return;
     }
+
+
+    // Incrementing identifier ensures actuators can reject out of time frames
+    comm->command.set_frame_id(comm->command.frame_id() + 1);
+    if (comm->command.frame_id() > 65535) comm->command.set_frame_id(0);
+
+    for (int i = 0; i < ROBIF2B_KINOVA_GEN3_NR_JOINTS; i++) {
+        comm->command.mutable_actuators(i)->set_command_id(comm->command.frame_id());
+
+        double pos = DEG_TO_RAD(comm->feedback.actuators(i).position());
+
+        switch (*b->ctrl_mode) {
+            case ROBIF2B_CTRL_MODE_POSITION:
+                assert(b->jnt_pos_cmd);
+                pos = b->jnt_pos_cmd[i];
+            break;
+
+            case ROBIF2B_CTRL_MODE_VELOCITY:
+                assert(b->jnt_vel_cmd);
+                pos += b->jnt_vel_cmd[i] * (*b->cycle_time);
+            break;
+
+            case ROBIF2B_CTRL_MODE_FORCE:
+                assert(b->jnt_trq_cmd);
+                comm->command.mutable_actuators(i)->set_torque_joint(b->jnt_trq_cmd[i]);
+            break;
+
+            case ROBIF2B_CTRL_MODE_CURRENT:
+                assert(b->act_cur_cmd);
+                comm->command.mutable_actuators(i)->set_current_motor(b->act_cur_cmd[i]);
+            break;
+        }
+
+        // Unconditionally set the position command to avoid too large deviations
+        comm->command.mutable_actuators(i)->set_position(RAD_TO_DEG(pos));
+    }
+
+    comm->feedback = comm->base_cyclic->Refresh(comm->command, 0);
 
     publish_measurement(b);
 
@@ -397,3 +378,20 @@ void robif2b_kinova_gen3_update(struct robif2b_kinova_gen3_nbx *b)
     *b->success = true;
 }
 
+
+void robif2b_kg3_robotiq_gripper_update(struct robif2b_kg3_robotiq_gripper_nbx *b)
+{
+    assert(b->gripper_pos_cmd);
+    assert(b->gripper_vel_cmd);
+    assert(b->gripper_frc_cmd);
+    
+    robif2b_kinova_gen3_comm *comm = b->comm;
+
+    comm->gripper_command->set_force(b->gripper_frc_cmd[0]);
+    comm->gripper_command->set_velocity(b->gripper_vel_cmd[0]);
+    comm->gripper_command->set_position(b->gripper_pos_cmd[0]);
+
+    publish_gripper_measurement(b);
+
+    *b->success = true;
+}

@@ -21,6 +21,18 @@ void robif2b_kinova_gen3_recover(struct robif2b_kinova_gen3_nbx *b);
 
 void robif2b_kinova_gen3_update(struct robif2b_kinova_gen3_nbx *b);
 
+void publish_measurement(struct robif2b_kinova_gen3_nbx *b);
+
+void robif2b_kg3_robotiq_gripper_configure(struct robif2b_kg3_robotiq_gripper_nbx *b);
+
+void robif2b_kg3_robotiq_gripper_start(struct robif2b_kg3_robotiq_gripper_nbx *b);
+
+void robif2b_kg3_robotiq_gripper_stop(struct robif2b_kg3_robotiq_gripper_nbx *b);
+
+void robif2b_kg3_robotiq_gripper_update(struct robif2b_kg3_robotiq_gripper_nbx *b);
+
+void publish_gripper_measurement(struct robif2b_kg3_robotiq_gripper_nbx *b);
+
 #ifdef __cplusplus
 }
 #endif

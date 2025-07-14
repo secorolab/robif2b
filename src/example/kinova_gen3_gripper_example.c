@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0
+#include "robif2b/types/kinova_gen3.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <stdbool.h>
@@ -22,6 +23,13 @@ int main(int argc, char **argv)
     double cur_cmd[] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
     double imu_ang_vel_msr[] = { 0.0, 0.0, 0.0 };
     double imu_lin_acc_msr[] = { 0.0, 0.0, 0.0 };
+    
+    float gripper_pos_msr[] = { 0.0 };
+    float gripper_vel_msr[] = { 0.0 };
+    float gripper_cur_msr[] = { 0.0 };
+    float gripper_pos_cmd[] = { 50.0 };
+    float gripper_vel_cmd[] = { 20.0 };
+    float gripper_frc_cmd[] = { 10.0 };
 
     struct robif2b_kinova_gen3_nbx rob = {
         // Configuration
@@ -50,10 +58,26 @@ int main(int argc, char **argv)
         .success = &success
     };
 
+    struct robif2b_kg3_robotiq_gripper_nbx gripper = {
+        .gripper_pos_msr = gripper_pos_msr,
+        .gripper_vel_msr = gripper_vel_msr,
+        .gripper_cur_msr = gripper_cur_msr,
+        .gripper_pos_cmd = gripper_pos_cmd,
+        .gripper_vel_cmd = gripper_vel_cmd,
+        .gripper_frc_cmd = gripper_frc_cmd,
+        .success         = &success
+    };
+
 
     robif2b_kinova_gen3_configure(&rob);
     if (!success) {
         printf("Error during gen3_configure\n");
+        goto shutdown;
+    }
+
+    robif2b_kg3_robotiq_gripper_configure(&gripper);
+     if (!success) {
+        printf("Error during gen3_robotiq_gripper_configure\n");
         goto shutdown;
     }
 
@@ -69,9 +93,16 @@ int main(int argc, char **argv)
         printf("Error during gen3_start\n");
         goto stop;
     }
+    
+    robif2b_kg3_robotiq_gripper_start(&gripper);
+    if (!success) {
+        printf("Error during gen3_robotiq_gripper_start\n");
+        goto stop;
+    } 
 
 
     for (int i = 0; i < 3000; i++) {
+        robif2b_kg3_robotiq_gripper_update(&gripper);
         robif2b_kinova_gen3_update(&rob);
         if (!success) {
             printf("Error during gen3_update\n");
@@ -82,6 +113,7 @@ int main(int argc, char **argv)
     }
 
 stop:
+    robif2b_kg3_robotiq_gripper_stop(&gripper);
     robif2b_kinova_gen3_stop(&rob);
     printf("Stopped\n");
 

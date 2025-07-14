@@ -37,7 +37,6 @@ struct robif2b_kinova_gen3_config
     const char *password;
     int session_timeout;        // [ms]
     int connection_timeout;     // [ms]
-    bool use_gripper;           // robotiq gripper
 };
 
 struct robif2b_kionva_gen3_cart_cmd
@@ -50,6 +49,18 @@ struct robif2b_kionva_gen3_cart_cmd
 
 struct robif2b_kinova_gen3_comm;
 
+struct robif2b_kg3_robotiq_gripper_nbx
+{
+    float *gripper_pos_msr;                  // [%]
+    float *gripper_vel_msr;                  // [%]
+    float *gripper_cur_msr;                  // [%]
+    float *gripper_pos_cmd;                  // [%]
+    float *gripper_vel_cmd;                  // [%]
+    float *gripper_frc_cmd;                  // [%]    
+    bool *success;
+    // Internal state
+    struct robif2b_kinova_gen3_comm *comm;
+};
 
 struct robif2b_kinova_gen3_nbx
 {
@@ -69,13 +80,6 @@ struct robif2b_kinova_gen3_nbx
     const double *act_cur_cmd;              // [A]
     double *imu_ang_vel_msr;                // XYZ [rad/s]
     double *imu_lin_acc_msr;                // XYZ [m/s^2]
-    float *gripper_pos_msr;                  // [%]
-    float *gripper_vel_msr;                  // [%]
-    float *gripper_cur_msr;                  // [%]
-    float *gripper_pos_cmd;                  // [%]
-    float *gripper_vel_cmd;                  // [%]
-    float *gripper_frc_cmd;                  // [%]
-    struct robif2b_kionva_gen3_cart_cmd cartesian_cmd;
     bool *success;
     // Internal state
     struct robif2b_kinova_gen3_comm *comm;
