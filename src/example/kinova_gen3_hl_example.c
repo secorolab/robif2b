@@ -16,92 +16,59 @@ int main(int argc, char **argv)
     double vel_msr[] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
     double eff_msr[] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
     double cur_msr[] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-    double pos_cmd[] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-    double vel_cmd[] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-    double eff_cmd[] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-    double cur_cmd[] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
     double imu_ang_vel_msr[] = { 0.0, 0.0, 0.0 };
     double imu_lin_acc_msr[] = { 0.0, 0.0, 0.0 };
+    float wrench_cmd[] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
     
-    float gripper_pos_msr[] = { 0.0 };
-    float gripper_vel_msr[] = { 0.0 };
-    float gripper_cur_msr[] = { 0.0 };
-    float gripper_pos_cmd[] = { 50.0 };
-    float gripper_vel_cmd[] = { 20.0 };
-    float gripper_frc_cmd[] = { 10.0 };
+    struct robif2b_kionva_gen3_cart_cmd cart_cmd = {
+        .reference_frame = ROBIF2B_KINOVA_CART_REF_FRAME_TOOL,
+        .wrench          = wrench_cmd,
+    };
 
-    struct robif2b_kinova_gen3_nbx rob = {
+    struct robif2b_kinova_gen3_hl_nbx rob = {
         // Configuration
         .conf.ip_address         = "192.168.1.10",
         .conf.port               = 10000,
-        .conf.port_real_time     = 10001,
         .conf.user               = "admin",
         .conf.password           = "admin",
         .conf.session_timeout    = 60000,
         .conf.connection_timeout = 2000,
 
         // Connections
-        .cycle_time = &cycle_time,
         .ctrl_mode = &ctrl_mode,
         .jnt_pos_msr = pos_msr,
         .jnt_vel_msr = vel_msr,
         .jnt_trq_msr = eff_msr,
         .act_cur_msr = cur_msr,
-        .jnt_pos_cmd = pos_cmd,
-        .jnt_vel_cmd = vel_cmd,
-        .jnt_trq_cmd = eff_cmd,
-        .act_cur_cmd = cur_cmd,
         .imu_ang_vel_msr = imu_ang_vel_msr,
         .imu_lin_acc_msr = imu_lin_acc_msr,
-        .success = &success
-    };
-
-    struct robif2b_kg3_robotiq_gripper_nbx gripper = {
-        .gripper_pos_msr = gripper_pos_msr,
-        .gripper_vel_msr = gripper_vel_msr,
-        .gripper_cur_msr = gripper_cur_msr,
-        .gripper_pos_cmd = gripper_pos_cmd,
-        .gripper_vel_cmd = gripper_vel_cmd,
-        .gripper_frc_cmd = gripper_frc_cmd,
-        .success         = &success
+        .cart_cmd = &cart_cmd,
+        .success  = &success
     };
 
 
-    robif2b_kinova_gen3_configure(&rob);
+    robif2b_kinova_gen3_hl_configure(&rob);
     if (!success) {
         printf("Error during gen3_configure\n");
         goto shutdown;
     }
 
-    robif2b_kg3_robotiq_gripper_configure(&gripper, &rob);
-     if (!success) {
-        printf("Error during gen3_robotiq_gripper_configure\n");
-        goto shutdown;
-    }
-
-    robif2b_kinova_gen3_recover(&rob);
+    robif2b_kinova_gen3_hl_recover(&rob);
     if (!success) {
         printf("Error during gen3_recover\n");
         goto shutdown;
     }
 
     printf("Starting\n");
-    robif2b_kinova_gen3_start(&rob);
+    robif2b_kinova_gen3_hl_start(&rob);
     if (!success) {
         printf("Error during gen3_start\n");
         goto stop;
     }
-    
-    robif2b_kg3_robotiq_gripper_start(&gripper);
-    if (!success) {
-        printf("Error during gen3_robotiq_gripper_start\n");
-        goto stop;
-    } 
 
 
     for (int i = 0; i < 3000; i++) {
-        robif2b_kg3_robotiq_gripper_update(&gripper);
-        robif2b_kinova_gen3_update(&rob);
+        robif2b_kinova_gen3_hl_update(&rob);
         if (!success) {
             printf("Error during gen3_update\n");
             goto stop;
@@ -111,12 +78,11 @@ int main(int argc, char **argv)
     }
 
 stop:
-    robif2b_kg3_robotiq_gripper_stop(&gripper);
-    robif2b_kinova_gen3_stop(&rob);
+    robif2b_kinova_gen3_hl_stop(&rob);
     printf("Stopped\n");
 
 shutdown:
-    robif2b_kinova_gen3_shutdown(&rob);
+    robif2b_kinova_gen3_hl_shutdown(&rob);
     if (!success) {
         printf("Error during gen3_shutdown\n");
         return 1;

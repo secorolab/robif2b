@@ -21,6 +21,7 @@
 #define RAD_TO_DEG(x) (x) * 180.0 / M_PI
 
 
+// low-level servoing
 void publish_measurement(struct robif2b_kinova_gen3_nbx *b)
 {
     assert(b->comm);
@@ -46,20 +47,6 @@ void publish_measurement(struct robif2b_kinova_gen3_nbx *b)
     b->imu_lin_acc_msr[0] = comm->feedback.base().imu_acceleration_x();
     b->imu_lin_acc_msr[1] = comm->feedback.base().imu_acceleration_y();
     b->imu_lin_acc_msr[2] = comm->feedback.base().imu_acceleration_z();
-}
-
-
-void publish_gripper_measurement(struct robif2b_kg3_robotiq_gripper_nbx *b)
-{
-    assert(b->gripper_pos_msr);
-    assert(b->gripper_vel_msr);
-    assert(b->gripper_cur_msr);
-    
-    robif2b_kinova_gen3_comm *comm = b->comm; 
-
-    b->gripper_pos_msr[0] = comm->feedback.interconnect().gripper_feedback().motor()[0].position();
-    b->gripper_vel_msr[0] = comm->feedback.interconnect().gripper_feedback().motor()[0].velocity();
-    b->gripper_cur_msr[0] = comm->feedback.interconnect().gripper_feedback().motor()[0].current_motor();
 }
 
 
@@ -134,14 +121,6 @@ void robif2b_kinova_gen3_configure(struct robif2b_kinova_gen3_nbx *b)
 }
 
 
-void robif2b_kg3_robotiq_gripper_configure(robif2b_kg3_robotiq_gripper_nbx *b, robif2b_kinova_gen3_comm *comm)
-{
-    b->comm = comm;
-
-    *b->success = false;
-}
-
-
 void robif2b_kinova_gen3_shutdown(struct robif2b_kinova_gen3_nbx *b)
 {
     assert(b);
@@ -184,64 +163,9 @@ void robif2b_kinova_gen3_start(struct robif2b_kinova_gen3_nbx *b)
 
     robif2b_kinova_gen3_comm *comm = b->comm;
 
-    switch (*b->servoing_mode) {
-        case ROBIF2B_KINOVA_SERVOING_LOW_LEVEL:
-            // Set the base in low-level servoing mode
-            comm->servoing_mode.set_servoing_mode(k_api::Base::ServoingMode::LOW_LEVEL_SERVOING);
-            break;
-        case ROBIF2B_KINOVA_SERVOING_SINGLE_LEVEL:
-            // Set the base in single-level servoing mode
-            comm->servoing_mode.set_servoing_mode(k_api::Base::ServoingMode::SINGLE_LEVEL_SERVOING);
-            break;
-        default:
-            robif2b_kinova_gen3_stop(b);
-            *b->success = false;
-            break;
-    }
-    
+    // Set the base in low-level servoing mode
+    comm->servoing_mode.set_servoing_mode(k_api::Base::ServoingMode::LOW_LEVEL_SERVOING);
     comm->base->SetServoingMode(comm->servoing_mode);
-
-    *b->success = true;
-}
-
-
-void robif2b_kg3_robotiq_gripper_start(struct robif2b_kg3_robotiq_gripper_nbx *b)
-{
-    assert(b);
-    assert(b->comm);
-    
-    robif2b_kinova_gen3_comm *comm = b->comm;
-
-    k_api::Base::ServoingModeInformation s_mode_info = comm->base->GetServoingMode();
-
-    if (s_mode_info.servoing_mode() != k_api::Base::ServoingMode::LOW_LEVEL_SERVOING)
-    {
-        *b->success = false;
-        return;
-    }
-
-    comm->command.mutable_interconnect()->mutable_command_id()->set_identifier(0);
-    comm->gripper_command = comm->command.mutable_interconnect()->mutable_gripper_command()->add_motor_cmd();
-
-    *b->success = true;
-}
-
-
-void robif2b_kg3_robotiq_gripper_stop(struct robif2b_kg3_robotiq_gripper_nbx *b)
-{
-    assert(b);
-    assert(b->success);
-    assert(b->comm);
-
-    robif2b_kinova_gen3_comm *comm = b->comm;
-
-    comm->gripper_command->clear_position();
-    comm->gripper_command->clear_velocity();
-    comm->gripper_command->clear_force();
-    comm->gripper_command->clear_motor_id();
-
-    comm->command.mutable_interconnect()->mutable_command_id()->clear_identifier();
-    comm->command.mutable_interconnect()->mutable_gripper_command()->clear_motor_cmd();
 
     *b->success = true;
 }
@@ -370,10 +294,330 @@ void robif2b_kinova_gen3_update(struct robif2b_kinova_gen3_nbx *b)
     }
 
     comm->feedback = comm->base_cyclic->Refresh(comm->command, 0);
-
     publish_measurement(b);
 
     b->ctrl_mode_prev = *b->ctrl_mode;
+
+    *b->success = true;
+}
+
+
+// high-level servoing
+void publish_hl_measurement(struct robif2b_kinova_gen3_hl_nbx *b)
+{
+    assert(b->comm);
+    assert(b->jnt_pos_msr);
+    assert(b->jnt_vel_msr);
+    assert(b->jnt_trq_msr);
+    assert(b->act_cur_msr);
+    assert(b->imu_ang_vel_msr);
+    assert(b->imu_lin_acc_msr);
+
+    robif2b_kinova_gen3_comm *comm = b->comm;
+
+    for (int i = 0; i < ROBIF2B_KINOVA_GEN3_NR_JOINTS; i++) {
+        b->jnt_pos_msr[i] = DEG_TO_RAD(comm->feedback.actuators(i).position());
+        b->jnt_vel_msr[i] = DEG_TO_RAD(comm->feedback.actuators(i).velocity());
+        b->jnt_trq_msr[i] = comm->feedback.actuators(i).torque();
+        b->act_cur_msr[i] = comm->feedback.actuators(i).current_motor();
+    }
+
+    b->imu_ang_vel_msr[0] = DEG_TO_RAD(comm->feedback.base().imu_angular_velocity_x());
+    b->imu_ang_vel_msr[1] = DEG_TO_RAD(comm->feedback.base().imu_angular_velocity_y());
+    b->imu_ang_vel_msr[2] = DEG_TO_RAD(comm->feedback.base().imu_angular_velocity_z());
+    b->imu_lin_acc_msr[0] = comm->feedback.base().imu_acceleration_x();
+    b->imu_lin_acc_msr[1] = comm->feedback.base().imu_acceleration_y();
+    b->imu_lin_acc_msr[2] = comm->feedback.base().imu_acceleration_z();
+}
+
+
+void robif2b_kinova_gen3_hl_configure(struct robif2b_kinova_gen3_hl_nbx *b)
+{
+    assert(b);
+    assert(b->jnt_pos_msr);
+    assert(b->success);
+
+    b->comm = new robif2b_kinova_gen3_comm;
+    if (!b->comm) {
+        *b->success = false;
+        return;
+    }
+
+    robif2b_kinova_gen3_comm *comm = b->comm;
+    robif2b_kinova_gen3_config *conf = &b->conf;
+
+    // Create API objects
+    auto error_callback = [](k_api::KError err){ std::cout << "_________ callback error _________" << err.toString() << std::endl; };
+
+    std::cout << "Creating transport objects" << std::endl;
+    comm->transport_tcp = new k_api::TransportClientTcp();
+    comm->router_tcp = new k_api::RouterClient(comm->transport_tcp, error_callback);
+    comm->transport_tcp->connect(conf->ip_address, conf->port);
+
+    std::cout << "Creating transport real time objects" << std::endl;
+    comm->transport_udp = new k_api::TransportClientUdp();
+    comm->router_udp = new k_api::RouterClient(comm->transport_udp, error_callback);
+    comm->transport_udp->connect(conf->ip_address, conf->port_real_time);
+
+    // Set session data connection information
+    auto create_session_info = k_api::Session::CreateSessionInfo();
+    create_session_info.set_username(conf->user);
+    create_session_info.set_password(conf->password);
+    create_session_info.set_session_inactivity_timeout(conf->session_timeout);
+    create_session_info.set_connection_inactivity_timeout(conf->connection_timeout);
+
+    // Session manager service wrapper
+    std::cout << "Creating session for communication" << std::endl;
+    comm->session_manager_tcp = new k_api::SessionManager(comm->router_tcp);
+    comm->session_manager_tcp->CreateSession(create_session_info);
+    comm->session_manager_udp = new k_api::SessionManager(comm->router_udp);
+    comm->session_manager_udp->CreateSession(create_session_info);
+    std::cout << "Session created" << std::endl;
+
+    // Create services
+    comm->base = new k_api::Base::BaseClient(comm->router_tcp);
+    comm->base_cyclic = new k_api::BaseCyclic::BaseCyclicClient(comm->router_udp);
+
+    // Get first state from the robot
+    comm->feedback = comm->base_cyclic->RefreshFeedback();
+    publish_hl_measurement(b);
+
+    *b->success = true;
+}
+
+
+void robif2b_kinova_gen3_hl_shutdown(struct robif2b_kinova_gen3_hl_nbx *b)
+{
+    assert(b);
+    assert(b->success);
+    assert(b->comm);
+
+    robif2b_kinova_gen3_comm *comm = b->comm;
+
+    // Close API session
+    comm->session_manager_udp->CloseSession();
+    comm->session_manager_tcp->CloseSession();
+
+    // Deactivate the router and cleanly disconnect from the transport object
+    comm->transport_udp->disconnect();
+    comm->router_udp->SetActivationStatus(false);
+    comm->transport_tcp->disconnect();
+    comm->router_tcp->SetActivationStatus(false);
+
+    // Destroy the API
+    delete comm->base;
+    delete comm->base_cyclic;
+    delete comm->actuator_config;
+    delete comm->session_manager_udp;
+    delete comm->session_manager_tcp;
+    delete comm->router_tcp;
+    delete comm->router_udp;
+    delete comm->transport_tcp;
+    delete comm->transport_udp;
+    delete comm;
+
+    *b->success = true;
+}
+
+
+void robif2b_kinova_gen3_hl_start(struct robif2b_kinova_gen3_hl_nbx *b)
+{
+    assert(b);
+    assert(b->success);
+    assert(b->comm);
+
+    robif2b_kinova_gen3_comm *comm = b->comm;
+
+    // Set the base in low-level servoing mode
+    comm->servoing_mode.set_servoing_mode(k_api::Base::ServoingMode::SINGLE_LEVEL_SERVOING);
+    comm->base->SetServoingMode(comm->servoing_mode);
+
+    *b->success = true;
+}
+
+
+void robif2b_kinova_gen3_hl_stop(struct robif2b_kinova_gen3_hl_nbx *b)
+{
+    assert(b);
+    assert(b->success);
+    assert(b->comm);
+
+    robif2b_kinova_gen3_comm *comm = b->comm;
+
+    // set the control mode to position
+    k_api::ActuatorConfig::ControlModeInformation ctrl_mode_msg = k_api::ActuatorConfig::ControlModeInformation();
+    ctrl_mode_msg.set_control_mode(k_api::ActuatorConfig::ControlMode::POSITION);
+
+    for (int i = 0; i < ROBIF2B_KINOVA_GEN3_NR_JOINTS; i++) {
+        // Note that the actuator IDs start at 1
+        comm->actuator_config->SetControlMode(ctrl_mode_msg, i + 1);
+    }
+
+    // Make movement stop
+    b->comm->base->Stop();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+    *b->success = true;
+}
+
+
+void robif2b_kinova_gen3_hl_recover(struct robif2b_kinova_gen3_hl_nbx *b)
+{
+    assert(b);
+    assert(b->success);
+    assert(b->comm);
+
+    try {
+        b->comm->base->ClearFaults();
+        *b->success = true;
+    } catch (...) {
+        *b->success = false;
+    }
+}
+
+
+void robif2b_kinova_gen3_hl_update(struct robif2b_kinova_gen3_hl_nbx *b)
+{
+    assert(b);
+    assert(b->ctrl_mode);
+    assert(b->comm);
+    assert(b->cart_cmd);
+    assert(b->success);
+
+    robif2b_kinova_gen3_comm *comm = b->comm;
+
+    const robif2b_kionva_gen3_cart_cmd *cart_cmd = b->cart_cmd;
+
+    k_api::Common::CartesianReferenceFrame ref_frame;
+
+    switch (cart_cmd->reference_frame) {
+        case ROBIF2B_KINOVA_CART_REF_FRAME_BASE:
+            ref_frame = k_api::Common::CARTESIAN_REFERENCE_FRAME_BASE;
+        break;
+        case ROBIF2B_KINOVA_CART_REF_FRAME_TOOL:
+            ref_frame = k_api::Common::CARTESIAN_REFERENCE_FRAME_TOOL;
+        break;
+        case ROBIF2B_KINOVA_CART_REF_FRAME_MIXED:
+            ref_frame = k_api::Common::CARTESIAN_REFERENCE_FRAME_MIXED;
+        break;
+        default:
+            robif2b_kinova_gen3_hl_stop(b);
+            *b->success = false;
+            return;
+    }
+
+    // Switch control mode
+    if (*b->ctrl_mode != b->ctrl_mode_prev) {
+
+        switch (*b->ctrl_mode) {
+            case ROBIF2B_CTRL_MODE_VELOCITY: {
+                auto command = k_api::Base::TwistCommand();
+                command.set_reference_frame(ref_frame);
+
+                auto twist = command.mutable_twist();
+                twist->set_linear_x(cart_cmd->twist[0]);
+                twist->set_linear_y(cart_cmd->twist[1]);
+                twist->set_linear_z(cart_cmd->twist[2]);
+                twist->set_angular_x(cart_cmd->twist[3]);
+                twist->set_angular_y(cart_cmd->twist[4]);
+                twist->set_angular_z(cart_cmd->twist[5]);
+
+                comm->base->SendTwistCommand(command);
+            }
+            break;
+
+            case ROBIF2B_CTRL_MODE_FORCE: {
+                auto command = k_api::Base::WrenchCommand();
+                command.set_reference_frame(ref_frame);
+                
+                auto wrench = command.mutable_wrench();
+                wrench->set_force_x(cart_cmd->wrench[0]);
+                wrench->set_force_y(cart_cmd->wrench[1]);
+                wrench->set_force_z(cart_cmd->wrench[2]);
+                wrench->set_torque_x(cart_cmd->wrench[3]);
+                wrench->set_torque_y(cart_cmd->wrench[4]);
+                wrench->set_torque_z(cart_cmd->wrench[5]);
+
+                comm->base->SendWrenchCommand(command);
+            }
+            break;
+
+            default:
+                robif2b_kinova_gen3_hl_stop(b);
+                *b->success = false;
+                return;
+        }
+
+    }
+
+    comm->feedback = comm->base_cyclic->Refresh(comm->command, 0);
+    publish_hl_measurement(b);
+
+    b->ctrl_mode_prev = *b->ctrl_mode;
+
+    *b->success = true;
+}
+
+// robotiq gripper
+void publish_gripper_measurement(struct robif2b_kg3_robotiq_gripper_nbx *b)
+{
+    assert(b->gripper_pos_msr);
+    assert(b->gripper_vel_msr);
+    assert(b->gripper_cur_msr);
+    
+    robif2b_kinova_gen3_comm *comm = b->comm; 
+
+    b->gripper_pos_msr[0] = comm->feedback.interconnect().gripper_feedback().motor()[0].position();
+    b->gripper_vel_msr[0] = comm->feedback.interconnect().gripper_feedback().motor()[0].velocity();
+    b->gripper_cur_msr[0] = comm->feedback.interconnect().gripper_feedback().motor()[0].current_motor();
+}
+
+
+void robif2b_kg3_robotiq_gripper_configure(robif2b_kg3_robotiq_gripper_nbx *b, robif2b_kinova_gen3_nbx *g)
+{
+    b->comm = g->comm;
+
+    *b->success = false;
+}
+
+
+void robif2b_kg3_robotiq_gripper_start(struct robif2b_kg3_robotiq_gripper_nbx *b)
+{
+    assert(b);
+    assert(b->comm);
+    
+    robif2b_kinova_gen3_comm *comm = b->comm;
+
+    k_api::Base::ServoingModeInformation s_mode_info = comm->base->GetServoingMode();
+
+    if (s_mode_info.servoing_mode() != k_api::Base::ServoingMode::LOW_LEVEL_SERVOING)
+    {
+        *b->success = false;
+        return;
+    }
+
+    comm->command.mutable_interconnect()->mutable_command_id()->set_identifier(0);
+    comm->gripper_command = *comm->command.mutable_interconnect()->mutable_gripper_command()->add_motor_cmd();
+
+    *b->success = true;
+}
+
+
+void robif2b_kg3_robotiq_gripper_stop(struct robif2b_kg3_robotiq_gripper_nbx *b)
+{
+    assert(b);
+    assert(b->success);
+    assert(b->comm);
+
+    robif2b_kinova_gen3_comm *comm = b->comm;
+
+    comm->gripper_command.clear_position();
+    comm->gripper_command.clear_velocity();
+    comm->gripper_command.clear_force();
+    comm->gripper_command.clear_motor_id();
+
+    comm->command.mutable_interconnect()->mutable_command_id()->clear_identifier();
+    comm->command.mutable_interconnect()->mutable_gripper_command()->clear_motor_cmd();
 
     *b->success = true;
 }
@@ -387,9 +631,9 @@ void robif2b_kg3_robotiq_gripper_update(struct robif2b_kg3_robotiq_gripper_nbx *
     
     robif2b_kinova_gen3_comm *comm = b->comm;
 
-    comm->gripper_command->set_force(b->gripper_frc_cmd[0]);
-    comm->gripper_command->set_velocity(b->gripper_vel_cmd[0]);
-    comm->gripper_command->set_position(b->gripper_pos_cmd[0]);
+    comm->gripper_command.set_force(b->gripper_frc_cmd[0]);
+    comm->gripper_command.set_velocity(b->gripper_vel_cmd[0]);
+    comm->gripper_command.set_position(b->gripper_pos_cmd[0]);
 
     publish_gripper_measurement(b);
 
