@@ -25,7 +25,7 @@ struct robif2b_kinova_gen3_comm
     k_api::BaseCyclic::BaseCyclicClient *base_cyclic;
     k_api::ActuatorConfig::ActuatorConfigClient *actuator_config;
     k_api::BaseCyclic::Command command;
-    k_api::GripperCyclic::MotorCommand gripper_command;
+    k_api::GripperCyclic::MotorCommand *gripper_command;
     k_api::BaseCyclic::Feedback feedback;
     k_api::Base::ServoingModeInformation servoing_mode;
 };
