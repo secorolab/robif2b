@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0
+#include "robif2b/types/control_mode.h"
 #include "robif2b/types/kinova_gen3.h"
 #include <stdio.h>
 #include <unistd.h>
@@ -11,7 +12,7 @@ int main(int argc, char **argv)
 {
     bool success = false;
     double cycle_time = 0.001;
-    enum robif2b_ctrl_mode ctrl_mode = ROBIF2B_CTRL_MODE_FORCE;
+    enum robif2b_ctrl_mode ctrl_mode = ROBIF2B_CTRL_MODE_POSITION;
     double pos_msr[] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
     double vel_msr[] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
     double eff_msr[] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
@@ -26,13 +27,13 @@ int main(int argc, char **argv)
     float gripper_pos_msr[] = { 0.0 };
     float gripper_vel_msr[] = { 0.0 };
     float gripper_cur_msr[] = { 0.0 };
-    float gripper_pos_cmd[] = { 50.0 };
+    float gripper_pos_cmd[] = { 0.0 };
     float gripper_vel_cmd[] = { 20.0 };
-    float gripper_frc_cmd[] = { 10.0 };
+    float gripper_frc_cmd[] = { 50.0 };
 
     struct robif2b_kinova_gen3_nbx rob = {
         // Configuration
-        .conf.ip_address         = "192.168.1.10",
+        .conf.ip_address         = "192.168.1.12",
         .conf.port               = 10000,
         .conf.port_real_time     = 10001,
         .conf.user               = "admin",
@@ -98,8 +99,8 @@ int main(int argc, char **argv)
         goto stop;
     } 
 
-
-    for (int i = 0; i < 3000; i++) {
+    printf("Running\n");
+    for (int i = 0; i < 1000; i++) {
         robif2b_kg3_robotiq_gripper_update(&gripper);
         robif2b_kinova_gen3_update(&rob);
         if (!success) {
@@ -107,7 +108,7 @@ int main(int argc, char **argv)
             goto stop;
         }
 
-        usleep(1000);
+        usleep(500);
     }
 
 stop:

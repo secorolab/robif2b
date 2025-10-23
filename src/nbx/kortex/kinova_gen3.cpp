@@ -226,7 +226,6 @@ void robif2b_kinova_gen3_update(struct robif2b_kinova_gen3_nbx *b)
 
     robif2b_kinova_gen3_comm *comm = b->comm;
 
-
     // Switch control mode
     if (*b->ctrl_mode != b->ctrl_mode_prev) {
         k_api::ActuatorConfig::ControlModeInformation ctrl_mode_msg = k_api::ActuatorConfig::ControlModeInformation();
@@ -255,6 +254,7 @@ void robif2b_kinova_gen3_update(struct robif2b_kinova_gen3_nbx *b)
             // Note that the actuator IDs start at 1
             comm->actuator_config->SetControlMode(ctrl_mode_msg, i + 1);
         }
+        usleep(100); // TODO: check if this is required. otherwise, more wrong servoing issues.
     }
 
 
@@ -577,7 +577,7 @@ void robif2b_kg3_robotiq_gripper_configure(robif2b_kg3_robotiq_gripper_nbx *b, r
 {
     b->comm = g->comm;
 
-    *b->success = false;
+    *b->success = true;
 }
 
 
@@ -597,7 +597,7 @@ void robif2b_kg3_robotiq_gripper_start(struct robif2b_kg3_robotiq_gripper_nbx *b
     }
 
     comm->command.mutable_interconnect()->mutable_command_id()->set_identifier(0);
-    comm->gripper_command = *comm->command.mutable_interconnect()->mutable_gripper_command()->add_motor_cmd();
+    comm->gripper_command = comm->command.mutable_interconnect()->mutable_gripper_command()->add_motor_cmd();
 
     *b->success = true;
 }
@@ -611,10 +611,10 @@ void robif2b_kg3_robotiq_gripper_stop(struct robif2b_kg3_robotiq_gripper_nbx *b)
 
     robif2b_kinova_gen3_comm *comm = b->comm;
 
-    comm->gripper_command.clear_position();
-    comm->gripper_command.clear_velocity();
-    comm->gripper_command.clear_force();
-    comm->gripper_command.clear_motor_id();
+    comm->gripper_command->clear_position();
+    comm->gripper_command->clear_velocity();
+    comm->gripper_command->clear_force();
+    comm->gripper_command->clear_motor_id();
 
     comm->command.mutable_interconnect()->mutable_command_id()->clear_identifier();
     comm->command.mutable_interconnect()->mutable_gripper_command()->clear_motor_cmd();
@@ -631,9 +631,9 @@ void robif2b_kg3_robotiq_gripper_update(struct robif2b_kg3_robotiq_gripper_nbx *
     
     robif2b_kinova_gen3_comm *comm = b->comm;
 
-    comm->gripper_command.set_force(b->gripper_frc_cmd[0]);
-    comm->gripper_command.set_velocity(b->gripper_vel_cmd[0]);
-    comm->gripper_command.set_position(b->gripper_pos_cmd[0]);
+    comm->gripper_command->set_force(b->gripper_frc_cmd[0]);
+    comm->gripper_command->set_velocity(b->gripper_vel_cmd[0]);
+    comm->gripper_command->set_position(b->gripper_pos_cmd[0]);
 
     publish_gripper_measurement(b);
 
