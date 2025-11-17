@@ -8,8 +8,8 @@ if(NOT EXISTS "${CMAKE_INSTALL_FULL_LIBDIR}/libKortexApiCpp.a" OR NOT EXISTS "${
   if(ENABLE_KORTEX_API_AUTO_DOWNLOAD)
     Set(FETCHCONTENT_QUIET FALSE)
 
-    File(DOWNLOAD 
-        https://artifactory.kinovaapps.com:443/artifactory/generic-public/kortex/API/2.6.0/linux_x86_64_gcc_5.4.zip
+    File(DOWNLOAD
+        https://artifactory.kinovaapps.com/artifactory/generic-public/kortex/API/2.7.0/linux_x86-64_gcc_5.4.zip
         ${CMAKE_CURRENT_BINARY_DIR}/kortex_api.zip
         SHOW_PROGRESS STATUS DOWNLOAD_RESULT
     )

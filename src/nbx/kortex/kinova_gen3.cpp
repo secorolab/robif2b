@@ -4,6 +4,7 @@
 #include "ActuatorConfig.pb.h"
 #include "Base.pb.h"
 #include "kinova_gen3_comm.hpp"
+#include "robif2b/types/control_mode.h"
 
 #include <cmath>
 #include <cassert>
@@ -354,11 +355,6 @@ void robif2b_kinova_gen3_hl_configure(struct robif2b_kinova_gen3_hl_nbx *b)
     comm->router_tcp = new k_api::RouterClient(comm->transport_tcp, error_callback);
     comm->transport_tcp->connect(conf->ip_address, conf->port);
 
-    std::cout << "Creating transport real time objects" << std::endl;
-    comm->transport_udp = new k_api::TransportClientUdp();
-    comm->router_udp = new k_api::RouterClient(comm->transport_udp, error_callback);
-    comm->transport_udp->connect(conf->ip_address, conf->port_real_time);
-
     // Set session data connection information
     auto create_session_info = k_api::Session::CreateSessionInfo();
     create_session_info.set_username(conf->user);
@@ -370,13 +366,11 @@ void robif2b_kinova_gen3_hl_configure(struct robif2b_kinova_gen3_hl_nbx *b)
     std::cout << "Creating session for communication" << std::endl;
     comm->session_manager_tcp = new k_api::SessionManager(comm->router_tcp);
     comm->session_manager_tcp->CreateSession(create_session_info);
-    comm->session_manager_udp = new k_api::SessionManager(comm->router_udp);
-    comm->session_manager_udp->CreateSession(create_session_info);
     std::cout << "Session created" << std::endl;
 
     // Create services
     comm->base = new k_api::Base::BaseClient(comm->router_tcp);
-    comm->base_cyclic = new k_api::BaseCyclic::BaseCyclicClient(comm->router_udp);
+    comm->base_cyclic = new k_api::BaseCyclic::BaseCyclicClient(comm->router_tcp);
 
     // Get first state from the robot
     comm->feedback = comm->base_cyclic->RefreshFeedback();
@@ -395,25 +389,18 @@ void robif2b_kinova_gen3_hl_shutdown(struct robif2b_kinova_gen3_hl_nbx *b)
     robif2b_kinova_gen3_comm *comm = b->comm;
 
     // Close API session
-    comm->session_manager_udp->CloseSession();
     comm->session_manager_tcp->CloseSession();
 
     // Deactivate the router and cleanly disconnect from the transport object
-    comm->transport_udp->disconnect();
-    comm->router_udp->SetActivationStatus(false);
     comm->transport_tcp->disconnect();
     comm->router_tcp->SetActivationStatus(false);
 
     // Destroy the API
     delete comm->base;
     delete comm->base_cyclic;
-    delete comm->actuator_config;
-    delete comm->session_manager_udp;
     delete comm->session_manager_tcp;
     delete comm->router_tcp;
-    delete comm->router_udp;
     delete comm->transport_tcp;
-    delete comm->transport_udp;
     delete comm;
 
     *b->success = true;
@@ -443,18 +430,22 @@ void robif2b_kinova_gen3_hl_stop(struct robif2b_kinova_gen3_hl_nbx *b)
     assert(b->comm);
 
     robif2b_kinova_gen3_comm *comm = b->comm;
-
-    // set the control mode to position
-    k_api::ActuatorConfig::ControlModeInformation ctrl_mode_msg = k_api::ActuatorConfig::ControlModeInformation();
-    ctrl_mode_msg.set_control_mode(k_api::ActuatorConfig::ControlMode::POSITION);
-
-    for (int i = 0; i < ROBIF2B_KINOVA_GEN3_NR_JOINTS; i++) {
-        // Note that the actuator IDs start at 1
-        comm->actuator_config->SetControlMode(ctrl_mode_msg, i + 1);
-    }
+    
+    // set reference frame to mixed before stopping
+    auto command = k_api::Base::TwistCommand();
+    command.set_reference_frame(k_api::Common::CARTESIAN_REFERENCE_FRAME_MIXED);
+    auto twist = command.mutable_twist();
+    twist->set_linear_x(0.0);
+    twist->set_linear_y(0.0);
+    twist->set_linear_z(0.0);
+    twist->set_angular_x(0.0);
+    twist->set_angular_y(0.0);
+    twist->set_angular_z(0.0);
+    comm->base->SendTwistCommand(command);
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     // Make movement stop
-    b->comm->base->Stop();
+    comm->base->Stop();
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
     *b->success = true;
@@ -481,16 +472,14 @@ void robif2b_kinova_gen3_hl_update(struct robif2b_kinova_gen3_hl_nbx *b)
     assert(b);
     assert(b->ctrl_mode);
     assert(b->comm);
-    assert(b->cart_cmd);
     assert(b->success);
 
     robif2b_kinova_gen3_comm *comm = b->comm;
 
-    const robif2b_kionva_gen3_cart_cmd *cart_cmd = b->cart_cmd;
 
     k_api::Common::CartesianReferenceFrame ref_frame;
 
-    switch (cart_cmd->reference_frame) {
+    switch (*b->reference_frame) {
         case ROBIF2B_KINOVA_CART_REF_FRAME_BASE:
             ref_frame = k_api::Common::CARTESIAN_REFERENCE_FRAME_BASE;
         break;
@@ -507,53 +496,61 @@ void robif2b_kinova_gen3_hl_update(struct robif2b_kinova_gen3_hl_nbx *b)
     }
 
     // Switch control mode
-    if (*b->ctrl_mode != b->ctrl_mode_prev) {
+    switch (*b->ctrl_mode) {
+        case ROBIF2B_HL_CTRL_MODE_TWIST: {
+            auto command = k_api::Base::TwistCommand();
+            command.set_reference_frame(ref_frame);
 
-        switch (*b->ctrl_mode) {
-            case ROBIF2B_CTRL_MODE_VELOCITY: {
-                auto command = k_api::Base::TwistCommand();
-                command.set_reference_frame(ref_frame);
+            auto twist = command.mutable_twist();
+            twist->set_linear_x((float) b->twist_cmd[0]);
+            twist->set_linear_y((float) b->twist_cmd[1]);
+            twist->set_linear_z((float) b->twist_cmd[2]);
+            twist->set_angular_x((float) b->twist_cmd[3]);
+            twist->set_angular_y((float) b->twist_cmd[4]);
+            twist->set_angular_z((float) b->twist_cmd[5]);
 
-                auto twist = command.mutable_twist();
-                twist->set_linear_x(cart_cmd->twist[0]);
-                twist->set_linear_y(cart_cmd->twist[1]);
-                twist->set_linear_z(cart_cmd->twist[2]);
-                twist->set_angular_x(cart_cmd->twist[3]);
-                twist->set_angular_y(cart_cmd->twist[4]);
-                twist->set_angular_z(cart_cmd->twist[5]);
-
-                comm->base->SendTwistCommand(command);
-            }
-            break;
-
-            case ROBIF2B_CTRL_MODE_FORCE: {
-                auto command = k_api::Base::WrenchCommand();
-                command.set_reference_frame(ref_frame);
-                
-                auto wrench = command.mutable_wrench();
-                wrench->set_force_x(cart_cmd->wrench[0]);
-                wrench->set_force_y(cart_cmd->wrench[1]);
-                wrench->set_force_z(cart_cmd->wrench[2]);
-                wrench->set_torque_x(cart_cmd->wrench[3]);
-                wrench->set_torque_y(cart_cmd->wrench[4]);
-                wrench->set_torque_z(cart_cmd->wrench[5]);
-
-                comm->base->SendWrenchCommand(command);
-            }
-            break;
-
-            default:
-                robif2b_kinova_gen3_hl_stop(b);
-                *b->success = false;
-                return;
+            comm->base->SendTwistCommand(command);
         }
+        break;
 
+        case ROBIF2B_HL_CTRL_MODE_WRENCH: {
+            auto command = k_api::Base::WrenchCommand();
+            Kinova::Api::Base::WrenchMode wrench_mode;
+            switch (*b->wrench_mode) {
+                case ROBIF2B_KINOVA_CART_WRENCH_MODE_RESTRICTED:
+                    wrench_mode = Kinova::Api::Base::WrenchMode::WRENCH_RESTRICTED;
+                break;
+                case ROBIF2B_KINOVA_CART_WRENCH_MODE_NORMAL:
+                    wrench_mode = Kinova::Api::Base::WrenchMode::WRENCH_NORMAL;
+                break;
+                default:
+                    robif2b_kinova_gen3_hl_stop(b);
+                    *b->success = false;
+                    return;
+            }
+            command.set_mode(wrench_mode);
+            command.set_reference_frame(ref_frame);
+            
+            auto wrench = command.mutable_wrench();
+            wrench->set_force_x((float) b->wrench_cmd[0]);
+            wrench->set_force_y((float) b->wrench_cmd[1]);
+            wrench->set_force_z((float) b->wrench_cmd[2]);
+            wrench->set_torque_x((float) b->wrench_cmd[3]);
+            wrench->set_torque_y((float) b->wrench_cmd[4]);
+            wrench->set_torque_z((float) b->wrench_cmd[5]);
+
+            comm->base->SendWrenchCommand(command);
+        }
+        break;
+
+        default:
+            robif2b_kinova_gen3_hl_stop(b);
+            *b->success = false;
+            return;
     }
 
-    comm->feedback = comm->base_cyclic->Refresh(comm->command, 0);
+    comm->feedback = comm->base_cyclic->RefreshFeedback();
     publish_hl_measurement(b);
-
-    b->ctrl_mode_prev = *b->ctrl_mode;
 
     *b->success = true;
 }

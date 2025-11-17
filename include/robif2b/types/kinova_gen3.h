@@ -64,11 +64,12 @@ enum robif2b_kinova_cart_ref_frame
 };
 
 
-struct robif2b_kionva_gen3_cart_cmd
+enum robif2b_kinova_cart_wrench_mode
 {
-    float *twist;       // [vx, vy, vz, wx, wy, wz]
-    float *wrench;      // [N, N, N, Nm, Nm, Nm]
-    enum robif2b_kinova_cart_ref_frame reference_frame;
+    // 0 restricts motion in a direction, non-zero allows compliance
+    ROBIF2B_KINOVA_CART_WRENCH_MODE_RESTRICTED = 0,
+    // allows compliance in all directions
+    ROBIF2B_KINOVA_CART_WRENCH_MODE_NORMAL
 };
 
 
@@ -77,18 +78,21 @@ struct robif2b_kinova_gen3_hl_nbx
     // configuration
     struct robif2b_kinova_gen3_config conf;
     // ports
-    enum robif2b_ctrl_mode *ctrl_mode;
+    enum robif2b_hl_ctrl_mode *ctrl_mode;
+    enum robif2b_kinova_cart_ref_frame   *reference_frame;
+    enum robif2b_kinova_cart_wrench_mode *wrench_mode;
     double *jnt_pos_msr;                    // [rad]
     double *jnt_vel_msr;                    // [rad/s]
     double *jnt_trq_msr;                    // [Nm]
     double *act_cur_msr;                    // [A]
     double *imu_ang_vel_msr;                // XYZ [rad/s]
     double *imu_lin_acc_msr;                // XYZ [m/s^2]
-    const struct robif2b_kionva_gen3_cart_cmd *cart_cmd;
+
+    const double *twist_cmd;    // [vx, vy, vz, wx, wy, wz]
+    const double *wrench_cmd;   // [N, N, N, Nm, Nm, Nm]
     bool *success;
     // Internal state
     struct robif2b_kinova_gen3_comm *comm;
-    enum robif2b_ctrl_mode ctrl_mode_prev; 
 };
 
 

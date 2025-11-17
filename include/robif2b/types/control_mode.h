@@ -14,6 +14,12 @@ enum robif2b_ctrl_mode
     ROBIF2B_CTRL_MODE_CURRENT  = 3
 };
 
+enum robif2b_hl_ctrl_mode
+{
+    ROBIF2B_HL_CTRL_MODE_TWIST  = 0,
+    ROBIF2B_HL_CTRL_MODE_WRENCH = 1
+};
+
 #ifdef __cplusplus
 }
 #endif
