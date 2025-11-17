@@ -329,6 +329,13 @@ void publish_hl_measurement(struct robif2b_kinova_gen3_hl_nbx *b)
     b->imu_lin_acc_msr[0] = comm->feedback.base().imu_acceleration_x();
     b->imu_lin_acc_msr[1] = comm->feedback.base().imu_acceleration_y();
     b->imu_lin_acc_msr[2] = comm->feedback.base().imu_acceleration_z();
+
+    b->tool_ext_wrench_msr[0] = comm->feedback.base().tool_external_wrench_force_x();
+    b->tool_ext_wrench_msr[1] = comm->feedback.base().tool_external_wrench_force_y();
+    b->tool_ext_wrench_msr[2] = comm->feedback.base().tool_external_wrench_force_z();
+    b->tool_ext_wrench_msr[3] = comm->feedback.base().tool_external_wrench_torque_x();
+    b->tool_ext_wrench_msr[4] = comm->feedback.base().tool_external_wrench_torque_y();
+    b->tool_ext_wrench_msr[5] = comm->feedback.base().tool_external_wrench_torque_z();
 }
 
 
@@ -355,6 +362,11 @@ void robif2b_kinova_gen3_hl_configure(struct robif2b_kinova_gen3_hl_nbx *b)
     comm->router_tcp = new k_api::RouterClient(comm->transport_tcp, error_callback);
     comm->transport_tcp->connect(conf->ip_address, conf->port);
 
+    std::cout << "Creating transport real time objects" << std::endl;
+    comm->transport_udp = new k_api::TransportClientUdp();
+    comm->router_udp = new k_api::RouterClient(comm->transport_udp, error_callback);
+    comm->transport_udp->connect(conf->ip_address, conf->port_real_time);
+
     // Set session data connection information
     auto create_session_info = k_api::Session::CreateSessionInfo();
     create_session_info.set_username(conf->user);
@@ -366,11 +378,14 @@ void robif2b_kinova_gen3_hl_configure(struct robif2b_kinova_gen3_hl_nbx *b)
     std::cout << "Creating session for communication" << std::endl;
     comm->session_manager_tcp = new k_api::SessionManager(comm->router_tcp);
     comm->session_manager_tcp->CreateSession(create_session_info);
+    comm->session_manager_udp = new k_api::SessionManager(comm->router_udp);
+    comm->session_manager_udp->CreateSession(create_session_info);
     std::cout << "Session created" << std::endl;
 
     // Create services
     comm->base = new k_api::Base::BaseClient(comm->router_tcp);
-    comm->base_cyclic = new k_api::BaseCyclic::BaseCyclicClient(comm->router_tcp);
+    comm->base_cyclic = new k_api::BaseCyclic::BaseCyclicClient(comm->router_udp);
+    comm->actuator_config = new k_api::ActuatorConfig::ActuatorConfigClient(comm->router_tcp);
 
     // Get first state from the robot
     comm->feedback = comm->base_cyclic->RefreshFeedback();
@@ -476,7 +491,6 @@ void robif2b_kinova_gen3_hl_update(struct robif2b_kinova_gen3_hl_nbx *b)
 
     robif2b_kinova_gen3_comm *comm = b->comm;
 
-
     k_api::Common::CartesianReferenceFrame ref_frame;
 
     switch (*b->reference_frame) {
@@ -530,7 +544,7 @@ void robif2b_kinova_gen3_hl_update(struct robif2b_kinova_gen3_hl_nbx *b)
             }
             command.set_mode(wrench_mode);
             command.set_reference_frame(ref_frame);
-            
+
             auto wrench = command.mutable_wrench();
             wrench->set_force_x((float) b->wrench_cmd[0]);
             wrench->set_force_y((float) b->wrench_cmd[1]);

@@ -87,6 +87,7 @@ struct robif2b_kinova_gen3_hl_nbx
     double *act_cur_msr;                    // [A]
     double *imu_ang_vel_msr;                // XYZ [rad/s]
     double *imu_lin_acc_msr;                // XYZ [m/s^2]
+    double *tool_ext_wrench_msr;            // [N, N, N, Nm, Nm, Nm]
 
     const double *twist_cmd;    // [vx, vy, vz, wx, wy, wz]
     const double *wrench_cmd;   // [N, N, N, Nm, Nm, Nm]
