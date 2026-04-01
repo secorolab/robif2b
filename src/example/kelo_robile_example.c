@@ -7,14 +7,8 @@
 #include <robif2b/functions/ethercat.h>
 #include <robif2b/functions/kelo_drive.h>
 #include <robif2b/functions/kelo_power_board.h>
+#include "time_util.h"
 
-
-static long timespec_to_usec(const struct timespec *t) {
-    const int NSEC_IN_USEC = 1000;
-    const int USEC_IN_SEC  = 1000000;
-
-    return t->tv_sec * USEC_IN_SEC + t->tv_nsec / NSEC_IN_USEC;
-}
 
 #define NUM_DRIVES 2
 #define NUM_SLAVES 3
