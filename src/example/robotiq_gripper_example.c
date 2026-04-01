@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LGPL-3.0
 #include <stdio.h>
 #include <unistd.h>
+#include <time.h>
 #include "robif2b/functions/robotiq_gripper.h"
 #include "robif2b/types/robotiq_gripper.h"
-
-#define MICRO_IN_MILI 1000
+#include "time_util.h"
 
 const char* err_code_to_str(enum robif2b_robotiq_gripper_error error) {
     switch (error) {
@@ -38,6 +38,10 @@ int main(int argc, char **argv)
     enum robif2b_robotiq_gripper_obj_status obj_status = ROBIF2B_ROBOTIQ_OBJ_UNKNOWN;
     enum robif2b_robotiq_gripper_status gripper_status = ROBIF2B_ROBOTIQ_UNKNOWN;
     enum robif2b_robotiq_gripper_error error = ROBIF2B_ROBOTIQ_NO_ERROR;
+    struct timespec start_time;
+    struct timespec end_time;
+    double cycle_sum_us;
+    int cycle_count;
 
     struct robif2b_robotiq_gripper_nbx gripper = {
         .conf.port = "/dev/ttyUSB0",
@@ -55,11 +59,15 @@ int main(int argc, char **argv)
         .success = &success,
     };
 
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
     robif2b_robotiq_gripper_configure(&gripper);
+    clock_gettime(CLOCK_MONOTONIC, &end_time);
     if (!success) {
         printf("Configuration failed, error: %s\n", err_code_to_str(error));
         goto shutdown;
     }
+    printf("Configuration time: %.5f msec\n",
+           (double) (timespec_to_usec(&end_time) - timespec_to_usec(&start_time)) / USEC_IN_MSEC);
 
     printf("Closing the gripper...\n");
     position_cmd = 0XFF;
@@ -68,15 +76,28 @@ int main(int argc, char **argv)
         printf("Closing failed, error: %s\n", err_code_to_str(error));
         goto shutdown;
     }
+    cycle_count = 0;
+    cycle_sum_us = 0.0;
     while (is_gripper_moving) {
+        clock_gettime(CLOCK_MONOTONIC, &start_time);
+
         robif2b_robotiq_gripper_update(&gripper);
-        printf("Closing, gripper position: %d\n", position_msr);
+
+        clock_gettime(CLOCK_MONOTONIC, &end_time);
+
         if (!success) {
             printf("Reading data failed, error: %s\n", err_code_to_str(error));
             goto shutdown;
         }
-        usleep(100 * MICRO_IN_MILI);
+
+        cycle_count += 1;
+        cycle_sum_us += timespec_to_usec(&end_time) - timespec_to_usec(&start_time);
+
+        printf("Closing, gripper position: %d\n", position_msr);
+        usleep(100 * USEC_IN_MSEC);
     }
+    printf("Average update time for closing (%d cycles): %.5f msec\n",
+           cycle_count, cycle_sum_us / cycle_count / USEC_IN_MSEC);
 
     printf("Openning the gripper at slower speed...\n");
     speed_cmd = 0x0F;
@@ -86,15 +107,30 @@ int main(int argc, char **argv)
         printf("Opening failed, error: %s\n", err_code_to_str(error));
         goto shutdown;
     }
+
+    cycle_count = 0;
+    cycle_sum_us = 0.0;
     while (is_gripper_moving) {
+        clock_gettime(CLOCK_MONOTONIC, &start_time);
+
         robif2b_robotiq_gripper_update(&gripper);
-        printf("Opening, gripper position: %d\n", position_msr);
+
+        clock_gettime(CLOCK_MONOTONIC, &end_time);
+
         if (!success) {
             printf("Reading data failed, error: %s\n", err_code_to_str(error));
             goto shutdown;
         }
-        usleep(100 * MICRO_IN_MILI);
+
+        cycle_count += 1;
+        cycle_sum_us += timespec_to_usec(&end_time) - timespec_to_usec(&start_time);
+
+        printf("Opening, gripper position: %d\n", position_msr);
+        usleep(100 * USEC_IN_MSEC);
     }
+
+    printf("Average update time for opening (%d cycles): %.5f msec\n",
+           cycle_count, cycle_sum_us / cycle_count / USEC_IN_MSEC);
 
 shutdown:
     printf("Shutting down...\n");
