@@ -45,10 +45,13 @@ endif()
 
 if(ENABLE_ROBOTIQ)
   add_executable(robotiq_gripper_example robotiq_gripper_example.c)
-  target_link_libraries(robotiq_gripper_example robotiq_gripper )
+  target_link_libraries(robotiq_gripper_example robotiq_gripper)
+
+  add_executable(robotiq_ft_example robotiq_ft_example.c)
+  target_link_libraries(robotiq_ft_example robotiq_ft_sensor)
 
   if(ENABLE_INSTALL_TARGETS)
-    set_target_properties(robotiq_gripper_example PROPERTIES
+    set_target_properties(robotiq_gripper_example robotiq_ft_example PROPERTIES
       INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}"
       INSTALL_RPATH_USE_LINK_PATH TRUE
     )

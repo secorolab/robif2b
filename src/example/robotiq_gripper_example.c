@@ -44,10 +44,10 @@ int main(int argc, char **argv)
     int cycle_count;
 
     struct robif2b_robotiq_gripper_nbx gripper = {
-        .conf.port = "/dev/ttyUSB0",
-        .conf.baudrate = 115200,
-        .conf.timeout_ms = 1,
-        .conf.slave_address = 0x09,
+        .serial.port = "/dev/ttyUSB0",
+        .serial.baudrate = 115200,
+        .serial.timeout_ms = 1,
+        .serial.slave_address = 0x09,
         .position_msr = &position_msr,
         .is_gripper_moving = &is_gripper_moving,
         .obj_detection_status = &obj_status,
