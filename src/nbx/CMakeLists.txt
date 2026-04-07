@@ -12,6 +12,6 @@ if(ENABLE_KELO)
   add_subdirectory(kelo)
 endif()
 
-if(ENABLE_ROBOTIQ)
+if(ENABLE_ROBOTIQ_FT OR ENABLE_ROBOTIQ_GRIPPER)
   add_subdirectory(robotiq)
 endif()
