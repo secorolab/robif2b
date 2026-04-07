@@ -15,7 +15,9 @@ struct robif2b_robotiq_ft_sensor_nbx {
                                             // on port field
     // Ports
     float *force_msr;                       // [N] XYZ forces
+    float *force_offset;                    // [N] XYZ forces
     float *moment_msr;                      // [Nm] XYZ moments
+    float *moment_offset;                   // [Nm] XYZ moments
     bool *success;
 };
 
