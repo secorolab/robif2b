@@ -8,6 +8,7 @@ extern "C" {
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "robif2b/types/serial.h"
 
 enum robif2b_robotiq_gripper_obj_status {
     ROBIF2B_ROBOTIQ_OBJ_MOVING = 0,
@@ -34,18 +35,11 @@ enum robif2b_robotiq_gripper_error {
     ROBIF2B_ROBOTIQ_ERR_WRITE,
 };
 
-struct robif2b_robotiq_gripper_config {
-    const char * port;
-    uint32_t baudrate;
-    double timeout_ms;      // timeout in milliseconds
-    uint8_t slave_address;
-};
-
 struct robif2b_robotiq_gripper_comm;
 
 struct robif2b_robotiq_gripper_nbx {
     // Configuration
-    struct robif2b_robotiq_gripper_config conf;
+    struct robif2b_serial_config serial;
     // Ports
     uint8_t *position_msr;
     bool *is_gripper_moving;

@@ -43,9 +43,22 @@ if(ENABLE_ETHERCAT)
   endif()
 endif()
 
-if(ENABLE_ROBOTIQ)
+if(ENABLE_ROBOTIQ_FT)
+  add_executable(robotiq_ft_example robotiq_ft_example.c)
+  target_link_libraries(robotiq_ft_example robotiq_ft_sensor)
+
+  if(ENABLE_INSTALL_TARGETS)
+    set_target_properties(robotiq_ft_example PROPERTIES
+      INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}"
+      INSTALL_RPATH_USE_LINK_PATH TRUE
+    )
+    install(TARGETS robotiq_ft_example DESTINATION bin/${PROJECT_NAME})
+  endif()
+endif()
+
+if(ENABLE_ROBOTIQ_GRIPPER)
   add_executable(robotiq_gripper_example robotiq_gripper_example.c)
-  target_link_libraries(robotiq_gripper_example robotiq_gripper )
+  target_link_libraries(robotiq_gripper_example robotiq_gripper)
 
   if(ENABLE_INSTALL_TARGETS)
     set_target_properties(robotiq_gripper_example PROPERTIES

@@ -8,9 +8,9 @@
 extern "C" {
 #endif
 
-void robif2b_robotiq_gripper_configure(struct robif2b_robotiq_gripper_nbx *b);  // Blocking
+void robif2b_robotiq_gripper_configure(struct robif2b_robotiq_gripper_nbx *b);  // ~2sec
 void robif2b_robotiq_gripper_shutdown(struct robif2b_robotiq_gripper_nbx *b);
-void robif2b_robotiq_gripper_update(struct robif2b_robotiq_gripper_nbx *b);
+void robif2b_robotiq_gripper_update(struct robif2b_robotiq_gripper_nbx *b);     // ~22msec
 
 #ifdef __cplusplus
 }

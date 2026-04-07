@@ -4,6 +4,10 @@
 
 * Simple Open EtherCAT Master ([SOEM](https://github.com/OpenEtherCATsociety/SOEM))  - for communication via EtherCAT
 * Kortex API 2.6.0 - for communication with Kinova Gen3 arms
+* Standalone Robotiq gripper library (via `ENABLE_ROBOTIQ_GRIPPER` option)
+  depends on [secorolab/robotiq_driver_noros](https://github.com/secorolab/robotiq_driver_noros) repo.
+* Standalone Robotiq force-torque sensor library (via `ENABLE_ROBOTIQ_FT` option)
+  depends on [secorolab/robotiq_ft](https://github.com/secorolab/robotiq_ft) repo.
 
 ## Workspace
 
