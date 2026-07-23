@@ -16,6 +16,15 @@ target_link_libraries(kinova_gen3
     ${KORTEXAPI_LIBRARIES}
 )
 
+# KortexApiCpp.a bundles its own protobuf runtime. Keep its internal protobuf
+# references bound to that runtime and hide the static-library symbols from
+# consumers to prevent conflicts with another protobuf runtime in the process.
+target_link_options(kinova_gen3
+  PRIVATE
+    "-Wl,-Bsymbolic"
+    "-Wl,--exclude-libs,ALL"
+)
+
 target_compile_definitions(kinova_gen3
   PRIVATE
     _OS_UNIX
