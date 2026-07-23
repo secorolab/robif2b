@@ -66,11 +66,3 @@ void robif2b_robotiq_ft_update(struct robif2b_robotiq_ft_sensor_nbx *b) {
 
     *b->success = true;
 }
-
-void robif2b_robotiq_ft_zero(struct robif2b_robotiq_ft_sensor_nbx *b) {
-    assert(b);
-    assert(b->success);
-
-    rq_set_zero();
-    *b->success = true;
-}

@@ -11,7 +11,6 @@ extern "C" {
 void robif2b_robotiq_ft_configure(struct robif2b_robotiq_ft_sensor_nbx *b);  // Blocking
 void robif2b_robotiq_ft_shutdown(struct robif2b_robotiq_ft_sensor_nbx *b);
 void robif2b_robotiq_ft_update(struct robif2b_robotiq_ft_sensor_nbx *b);
-void robif2b_robotiq_ft_zero(struct robif2b_robotiq_ft_sensor_nbx *b);
 
 #ifdef __cplusplus
 }
