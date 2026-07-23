@@ -16,11 +16,9 @@ target_link_libraries(kinova_gen3
     ${KORTEXAPI_LIBRARIES}
 )
 
-# KortexApiCpp.a contains its own protobuf 3.5 runtime, while generated
-# motion-spec executables also use the system protobuf for frame logging.  Keep
-# Kortex's internal protobuf references bound to its bundled runtime and hide
-# those static-library symbols from the executable, preventing cross-runtime
-# descriptor/arena calls during process startup.
+# KortexApiCpp.a bundles its own protobuf runtime. Keep its internal protobuf
+# references bound to that runtime and hide the static-library symbols from
+# consumers to prevent conflicts with another protobuf runtime in the process.
 target_link_options(kinova_gen3
   PRIVATE
     "-Wl,-Bsymbolic"
