@@ -19,10 +19,10 @@ int main(int argc, char **argv)
     struct timespec end_time;
 
     struct robif2b_robotiq_ft_sensor_nbx ft_sensor = {
-        .serial.port = "ttyUSB0",
-        .serial.baudrate = 19200,       // unused
-        .serial.timeout_ms = 1,         // unused
-        .serial.slave_address = 0x09,   // unused
+        .serial.port = "/dev/ttyUSB0",
+        .serial.baudrate = 19200,
+        .serial.timeout_ms = 100,       // the sensor streams every 10 ms
+        .serial.slave_address = 0x09,
         .force_msr = force_msr,
         .force_offset = force_offset,
         .moment_msr = moment_msr,
@@ -48,15 +48,20 @@ int main(int argc, char **argv)
            (double) (timespec_to_usec(&end_time) - timespec_to_usec(&start_time)) / USEC_IN_MSEC);
 
     int cycle_count = 0;
+    int missed = 0;
     double cycle_sum_us = 0.0;
     for (int i = 0; i < NUM_READS; i++) {
         clock_gettime(CLOCK_MONOTONIC, &start_time);
         robif2b_robotiq_ft_update(&ft_sensor);
         clock_gettime(CLOCK_MONOTONIC, &end_time);
 
+        // A missing sample is not the end of the run: the driver reconnects once enough of them
+        // in a row say the connection is gone, and the reading keeps its last value until then.
         if (!success) {
-            printf("Reading data failed\n");
-            goto shutdown;
+            printf("No sample this cycle\n");
+            missed++;
+            usleep(10 * USEC_IN_MSEC);
+            continue;
         }
 
         cycle_count += 1;
@@ -79,8 +84,10 @@ int main(int argc, char **argv)
         clock_gettime(CLOCK_MONOTONIC, &end_time);
 
         if (!success) {
-            printf("Reading data failed\n");
-            goto shutdown;
+            printf("No sample this cycle\n");
+            missed++;
+            usleep(10 * USEC_IN_MSEC);
+            continue;
         }
 
         cycle_count += 1;
@@ -92,8 +99,8 @@ int main(int argc, char **argv)
         usleep(10 * USEC_IN_MSEC);
     }
 
-    printf("Average update time (%d cycles): %.5f msec\n",
-           cycle_count, cycle_sum_us / cycle_count / USEC_IN_MSEC);
+    printf("Average update time (%d cycles): %.5f msec, %d missed\n",
+           cycle_count, cycle_sum_us / cycle_count / USEC_IN_MSEC, missed);
 
 shutdown:
     printf("Shutting down...\n");
