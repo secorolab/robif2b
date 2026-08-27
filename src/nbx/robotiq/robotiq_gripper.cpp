@@ -89,7 +89,8 @@ void robif2b_robotiq_gripper_configure(struct robif2b_robotiq_gripper_nbx *b) {
 
     comm->serial->set_port(b->serial.port);
     comm->serial->set_baudrate(b->serial.baudrate);
-    comm->serial->set_timeout(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::duration<double>(b->serial.timeout_ms)));
+    comm->serial->set_timeout(std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::duration<double, std::milli>(b->serial.timeout_ms)));
 
     comm->driver = std::make_unique<rd::DefaultDriver>(std::move(comm->serial));
     comm->driver->set_slave_address(b->serial.slave_address);

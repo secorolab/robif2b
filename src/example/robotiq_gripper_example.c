@@ -46,7 +46,7 @@ int main(int argc, char **argv)
     struct robif2b_robotiq_gripper_nbx gripper = {
         .serial.port = "/dev/ttyUSB0",
         .serial.baudrate = 115200,
-        .serial.timeout_ms = 1,
+        .serial.timeout_ms = 1000,      // what the field says: milliseconds
         .serial.slave_address = 0x09,
         .position_msr = &position_msr,
         .is_gripper_moving = &is_gripper_moving,

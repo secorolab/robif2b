@@ -21,7 +21,7 @@ int main(int argc, char **argv)
     struct robif2b_robotiq_ft_sensor_nbx ft_sensor = {
         .serial.port = "/dev/ttyUSB0",
         .serial.baudrate = 19200,
-        .serial.timeout_ms = 100,       // the sensor streams every 10 ms
+        .serial.timeout_ms = 50,        // the sensor streams every 10 ms
         .serial.slave_address = 0x09,
         .force_msr = force_msr,
         .force_offset = force_offset,
