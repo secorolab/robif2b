@@ -20,6 +20,7 @@
 
 #define DEG_TO_RAD(x) (x) * M_PI / 180.0
 #define RAD_TO_DEG(x) (x) * 180.0 / M_PI
+#define US_TO_S(x) (x) * 1e-6
 
 
 // low-level servoing
@@ -40,6 +41,19 @@ void publish_measurement(struct robif2b_kinova_gen3_nbx *b)
         b->jnt_vel_msr[i] = DEG_TO_RAD(comm->feedback.actuators(i).velocity());
         b->jnt_trq_msr[i] = comm->feedback.actuators(i).torque();
         b->act_cur_msr[i] = comm->feedback.actuators(i).current_motor();
+
+        if (b->jnt_volt_msr)
+            b->jnt_volt_msr[i] = comm->feedback.actuators(i).voltage();
+        if (b->jnt_temp_motor_msr)
+            b->jnt_temp_motor_msr[i] = comm->feedback.actuators(i).temperature_motor();
+        if (b->jnt_temp_core_msr)
+            b->jnt_temp_core_msr[i] = comm->feedback.actuators(i).temperature_core();
+        if (b->jnt_comm_jitter_msr)
+            b->jnt_comm_jitter_msr[i] = US_TO_S(comm->feedback.actuators(i).jitter_comm());
+        if (b->jnt_fault_flags)
+            b->jnt_fault_flags[i] = comm->feedback.actuators(i).fault_bank_a();
+        if (b->jnt_warning_flags)
+            b->jnt_warning_flags[i] = comm->feedback.actuators(i).warning_bank_a();
     }
 
     b->imu_ang_vel_msr[0] = DEG_TO_RAD(comm->feedback.base().imu_angular_velocity_x());
@@ -48,6 +62,28 @@ void publish_measurement(struct robif2b_kinova_gen3_nbx *b)
     b->imu_lin_acc_msr[0] = comm->feedback.base().imu_acceleration_x();
     b->imu_lin_acc_msr[1] = comm->feedback.base().imu_acceleration_y();
     b->imu_lin_acc_msr[2] = comm->feedback.base().imu_acceleration_z();
+
+    if (b->icm_imu_ang_vel_msr) {
+        b->icm_imu_ang_vel_msr[0] = DEG_TO_RAD(comm->feedback.interconnect().imu_angular_velocity_x());
+        b->icm_imu_ang_vel_msr[1] = DEG_TO_RAD(comm->feedback.interconnect().imu_angular_velocity_y());
+        b->icm_imu_ang_vel_msr[2] = DEG_TO_RAD(comm->feedback.interconnect().imu_angular_velocity_z());
+    }
+
+    if (b->icm_imu_lin_acc_msr) {
+        b->icm_imu_lin_acc_msr[0] = comm->feedback.interconnect().imu_acceleration_x();
+        b->icm_imu_lin_acc_msr[1] = comm->feedback.interconnect().imu_acceleration_y();
+        b->icm_imu_lin_acc_msr[2] = comm->feedback.interconnect().imu_acceleration_z();
+    }
+
+    if (b->fault_flags) *b->fault_flags = comm->feedback.base().fault_bank_a();
+    if (b->warning_flags) *b->warning_flags = comm->feedback.base().warning_bank_a();
+    if (b->arm_volt_msr) *b->arm_volt_msr = comm->feedback.base().arm_voltage();
+    if (b->arm_cur_msr) *b->arm_cur_msr = comm->feedback.base().arm_current();
+    if (b->cpu_temp_msr) *b->cpu_temp_msr = comm->feedback.base().temperature_cpu();
+    if (b->ambient_temp_msr) *b->ambient_temp_msr = comm->feedback.base().temperature_ambient();
+
+    if (b->arm_state)
+        *b->arm_state = (enum robif2b_kinova_arm_state) comm->feedback.base().active_state();
 }
 
 

@@ -30,7 +30,25 @@ struct robif2b_kinova_gen3_config
 struct robif2b_kinova_gen3_comm;
 
 
+enum robif2b_kinova_arm_state
+{
+    ROBIF2B_KINOVA_ARM_STATE_UNSPECIFIED         = 0,
+    ROBIF2B_KINOVA_ARM_STATE_BASE_INITIALIZATION = 1,
+    ROBIF2B_KINOVA_ARM_STATE_IDLE                = 2,
+    ROBIF2B_KINOVA_ARM_STATE_INITIALIZATION      = 3,
+    ROBIF2B_KINOVA_ARM_STATE_IN_FAULT            = 4,
+    ROBIF2B_KINOVA_ARM_STATE_MAINTENANCE         = 5,
+    ROBIF2B_KINOVA_ARM_STATE_SERVOING_LOW_LEVEL  = 6,
+    ROBIF2B_KINOVA_ARM_STATE_SERVOING_READY      = 7,
+    ROBIF2B_KINOVA_ARM_STATE_SERVOING_SEQUENCE   = 8,
+    ROBIF2B_KINOVA_ARM_STATE_SERVOING_MANUAL     = 9
+};
+
+
 // low-level servoing
+// Ports from jnt_volt_msr onwards are optional: only written when connected.
+// The base stops computing kinematics in this mode, so no TCP pose, twist or
+// external wrench is available here; use the high-level block for those.
 struct robif2b_kinova_gen3_nbx
 {
     // Configuration
@@ -48,6 +66,21 @@ struct robif2b_kinova_gen3_nbx
     const double *act_cur_cmd;              // [A]
     double *imu_ang_vel_msr;                // XYZ [rad/s]
     double *imu_lin_acc_msr;                // XYZ [m/s^2]
+    double *jnt_volt_msr;                   // [V]
+    double *jnt_temp_motor_msr;             // [deg C]
+    double *jnt_temp_core_msr;              // [deg C]
+    double *jnt_comm_jitter_msr;            // [s]
+    double *arm_volt_msr;                   // [V]
+    double *arm_cur_msr;                    // [A]
+    double *cpu_temp_msr;                   // [deg C]
+    double *ambient_temp_msr;               // [deg C]
+    double *icm_imu_ang_vel_msr;            // interface module, XYZ [rad/s]
+    double *icm_imu_lin_acc_msr;            // interface module, XYZ [m/s^2]
+    uint32_t *fault_flags;
+    uint32_t *warning_flags;
+    uint32_t *jnt_fault_flags;
+    uint32_t *jnt_warning_flags;
+    enum robif2b_kinova_arm_state *arm_state;
     bool *success;
     // Internal state
     struct robif2b_kinova_gen3_comm *comm;
