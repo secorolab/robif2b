@@ -330,12 +330,14 @@ void publish_hl_measurement(struct robif2b_kinova_gen3_hl_nbx *b)
     b->imu_lin_acc_msr[1] = comm->feedback.base().imu_acceleration_y();
     b->imu_lin_acc_msr[2] = comm->feedback.base().imu_acceleration_z();
 
-    b->tool_ext_wrench_msr[0] = comm->feedback.base().tool_external_wrench_force_x();
-    b->tool_ext_wrench_msr[1] = comm->feedback.base().tool_external_wrench_force_y();
-    b->tool_ext_wrench_msr[2] = comm->feedback.base().tool_external_wrench_force_z();
-    b->tool_ext_wrench_msr[3] = comm->feedback.base().tool_external_wrench_torque_x();
-    b->tool_ext_wrench_msr[4] = comm->feedback.base().tool_external_wrench_torque_y();
-    b->tool_ext_wrench_msr[5] = comm->feedback.base().tool_external_wrench_torque_z();
+    if (b->tool_ext_wrench_msr) {
+        b->tool_ext_wrench_msr[0] = comm->feedback.base().tool_external_wrench_force_x();
+        b->tool_ext_wrench_msr[1] = comm->feedback.base().tool_external_wrench_force_y();
+        b->tool_ext_wrench_msr[2] = comm->feedback.base().tool_external_wrench_force_z();
+        b->tool_ext_wrench_msr[3] = comm->feedback.base().tool_external_wrench_torque_x();
+        b->tool_ext_wrench_msr[4] = comm->feedback.base().tool_external_wrench_torque_y();
+        b->tool_ext_wrench_msr[5] = comm->feedback.base().tool_external_wrench_torque_z();
+    }
 }
 
 
