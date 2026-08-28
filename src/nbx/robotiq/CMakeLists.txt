@@ -29,9 +29,9 @@ endif()
 
 # Force-torque Sensor
 if(ENABLE_ROBOTIQ_FT)
-find_package(robotiq_ft)
+find_package(robotiq_driver_noros)
 
-add_library(robotiq_ft_sensor SHARED robotiq_ft_sensor.c)
+add_library(robotiq_ft_sensor SHARED robotiq_ft_sensor.cpp)
 target_include_directories(robotiq_ft_sensor
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
@@ -39,7 +39,11 @@ target_include_directories(robotiq_ft_sensor
 )
 target_link_libraries(robotiq_ft_sensor
   PRIVATE
-    robotiq::robotiq_ft_driver
+    robotiq::robotiq_driver_noros
+)
+target_compile_options(robotiq_ft_sensor
+  PRIVATE
+    -Wall -Wextra -pedantic
 )
 install(
   TARGETS robotiq_ft_sensor

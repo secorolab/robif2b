@@ -42,6 +42,9 @@ struct robif2b_robotiq_gripper_nbx {
     struct robif2b_serial_config serial;
     // Ports
     uint8_t *position_msr;
+    // Optional: only written when connected. Reads near zero once the fingers
+    // stop, so it tracks motion effort, not grip force.
+    double *current_msr;                    // [A]
     bool *is_gripper_moving;
     // Object detection returned from gripper via serial,
     // doesn't work well for smaller objects

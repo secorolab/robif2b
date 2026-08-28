@@ -8,8 +8,10 @@
 
 #include <cmath>
 #include <cassert>
+#include <exception>
 
 // Kinova Kortex
+#include <KBasicException.h>
 #include <IRouterClient.h>
 #include <RouterClient.h>
 
@@ -20,6 +22,7 @@
 
 #define DEG_TO_RAD(x) (x) * M_PI / 180.0
 #define RAD_TO_DEG(x) (x) * 180.0 / M_PI
+#define US_TO_S(x) (x) * 1e-6
 
 
 // low-level servoing
@@ -40,6 +43,19 @@ void publish_measurement(struct robif2b_kinova_gen3_nbx *b)
         b->jnt_vel_msr[i] = DEG_TO_RAD(comm->feedback.actuators(i).velocity());
         b->jnt_trq_msr[i] = comm->feedback.actuators(i).torque();
         b->act_cur_msr[i] = comm->feedback.actuators(i).current_motor();
+
+        if (b->jnt_volt_msr)
+            b->jnt_volt_msr[i] = comm->feedback.actuators(i).voltage();
+        if (b->jnt_temp_motor_msr)
+            b->jnt_temp_motor_msr[i] = comm->feedback.actuators(i).temperature_motor();
+        if (b->jnt_temp_core_msr)
+            b->jnt_temp_core_msr[i] = comm->feedback.actuators(i).temperature_core();
+        if (b->jnt_comm_jitter_msr)
+            b->jnt_comm_jitter_msr[i] = US_TO_S(comm->feedback.actuators(i).jitter_comm());
+        if (b->jnt_fault_flags)
+            b->jnt_fault_flags[i] = comm->feedback.actuators(i).fault_bank_a();
+        if (b->jnt_warning_flags)
+            b->jnt_warning_flags[i] = comm->feedback.actuators(i).warning_bank_a();
     }
 
     b->imu_ang_vel_msr[0] = DEG_TO_RAD(comm->feedback.base().imu_angular_velocity_x());
@@ -48,6 +64,28 @@ void publish_measurement(struct robif2b_kinova_gen3_nbx *b)
     b->imu_lin_acc_msr[0] = comm->feedback.base().imu_acceleration_x();
     b->imu_lin_acc_msr[1] = comm->feedback.base().imu_acceleration_y();
     b->imu_lin_acc_msr[2] = comm->feedback.base().imu_acceleration_z();
+
+    if (b->icm_imu_ang_vel_msr) {
+        b->icm_imu_ang_vel_msr[0] = DEG_TO_RAD(comm->feedback.interconnect().imu_angular_velocity_x());
+        b->icm_imu_ang_vel_msr[1] = DEG_TO_RAD(comm->feedback.interconnect().imu_angular_velocity_y());
+        b->icm_imu_ang_vel_msr[2] = DEG_TO_RAD(comm->feedback.interconnect().imu_angular_velocity_z());
+    }
+
+    if (b->icm_imu_lin_acc_msr) {
+        b->icm_imu_lin_acc_msr[0] = comm->feedback.interconnect().imu_acceleration_x();
+        b->icm_imu_lin_acc_msr[1] = comm->feedback.interconnect().imu_acceleration_y();
+        b->icm_imu_lin_acc_msr[2] = comm->feedback.interconnect().imu_acceleration_z();
+    }
+
+    if (b->fault_flags) *b->fault_flags = comm->feedback.base().fault_bank_a();
+    if (b->warning_flags) *b->warning_flags = comm->feedback.base().warning_bank_a();
+    if (b->arm_volt_msr) *b->arm_volt_msr = comm->feedback.base().arm_voltage();
+    if (b->arm_cur_msr) *b->arm_cur_msr = comm->feedback.base().arm_current();
+    if (b->cpu_temp_msr) *b->cpu_temp_msr = comm->feedback.base().temperature_cpu();
+    if (b->ambient_temp_msr) *b->ambient_temp_msr = comm->feedback.base().temperature_ambient();
+
+    if (b->arm_state)
+        *b->arm_state = (enum robif2b_kinova_arm_state) comm->feedback.base().active_state();
 }
 
 
@@ -55,10 +93,15 @@ void robif2b_kinova_gen3_configure(struct robif2b_kinova_gen3_nbx *b)
 {
     assert(b);
     assert(b->jnt_pos_msr);
+    assert(b->error);
     assert(b->success);
+
+    *b->error = ROBIF2B_KINOVA_NO_ERROR;
+    *b->success = true;
 
     b->comm = new robif2b_kinova_gen3_comm;
     if (!b->comm) {
+        *b->error = ROBIF2B_KINOVA_ERR_MEMORY;
         *b->success = false;
         return;
     }
@@ -72,12 +115,19 @@ void robif2b_kinova_gen3_configure(struct robif2b_kinova_gen3_nbx *b)
     std::cout << "Creating transport objects" << std::endl;
     comm->transport_tcp = new k_api::TransportClientTcp();
     comm->router_tcp = new k_api::RouterClient(comm->transport_tcp, error_callback);
-    comm->transport_tcp->connect(conf->ip_address, conf->port);
 
     std::cout << "Creating transport real time objects" << std::endl;
     comm->transport_udp = new k_api::TransportClientUdp();
     comm->router_udp = new k_api::RouterClient(comm->transport_udp, error_callback);
-    comm->transport_udp->connect(conf->ip_address, conf->port_real_time);
+
+    try {
+        comm->transport_tcp->connect(conf->ip_address, conf->port);
+        comm->transport_udp->connect(conf->ip_address, conf->port_real_time);
+    } catch (std::exception &) {
+        *b->error = ROBIF2B_KINOVA_ERR_CONNECTION;
+        *b->success = false;
+        return;
+    }
 
     // Set session data connection information
     auto create_session_info = k_api::Session::CreateSessionInfo();
@@ -89,9 +139,16 @@ void robif2b_kinova_gen3_configure(struct robif2b_kinova_gen3_nbx *b)
     // Session manager service wrapper
     std::cout << "Creating session for communication" << std::endl;
     comm->session_manager_tcp = new k_api::SessionManager(comm->router_tcp);
-    comm->session_manager_tcp->CreateSession(create_session_info);
     comm->session_manager_udp = new k_api::SessionManager(comm->router_udp);
-    comm->session_manager_udp->CreateSession(create_session_info);
+
+    try {
+        comm->session_manager_tcp->CreateSession(create_session_info);
+        comm->session_manager_udp->CreateSession(create_session_info);
+    } catch (k_api::KBasicException &) {
+        *b->error = ROBIF2B_KINOVA_ERR_SESSION;
+        *b->success = false;
+        return;
+    }
     std::cout << "Session created" << std::endl;
 
     // Create services
@@ -100,7 +157,13 @@ void robif2b_kinova_gen3_configure(struct robif2b_kinova_gen3_nbx *b)
     comm->actuator_config = new k_api::ActuatorConfig::ActuatorConfigClient(comm->router_tcp);
 
     // Get first state from the robot
-    comm->feedback = comm->base_cyclic->RefreshFeedback();
+    try {
+        comm->feedback = comm->base_cyclic->RefreshFeedback();
+    } catch (k_api::KBasicException &) {
+        *b->error = ROBIF2B_KINOVA_ERR_READ;
+        *b->success = false;
+        return;
+    }
     publish_measurement(b);
 
     // Initialize each actuator to its current position
@@ -114,25 +177,38 @@ void robif2b_kinova_gen3_configure(struct robif2b_kinova_gen3_nbx *b)
         act->set_velocity(0.0);
 
         // Note that the actuator IDs start at 1
-        comm->actuator_config->SetControlMode(ctrl_mode_msg, i + 1);
+        try {
+            comm->actuator_config->SetControlMode(ctrl_mode_msg, i + 1);
+        } catch (k_api::KBasicException &) {
+            *b->error = ROBIF2B_KINOVA_ERR_CTRL_MODE;
+            *b->success = false;
+            return;
+        }
     }
     b->ctrl_mode_prev = ROBIF2B_CTRL_MODE_VELOCITY;
-
-    *b->success = true;
 }
 
 
 void robif2b_kinova_gen3_shutdown(struct robif2b_kinova_gen3_nbx *b)
 {
     assert(b);
+    assert(b->error);
     assert(b->success);
     assert(b->comm);
 
+    *b->error = ROBIF2B_KINOVA_NO_ERROR;
+    *b->success = true;
+
     robif2b_kinova_gen3_comm *comm = b->comm;
 
-    // Close API session
-    comm->session_manager_udp->CloseSession();
-    comm->session_manager_tcp->CloseSession();
+    // Close API session. A lost session still has to free everything below.
+    try {
+        comm->session_manager_udp->CloseSession();
+        comm->session_manager_tcp->CloseSession();
+    } catch (k_api::KBasicException &) {
+        *b->error = ROBIF2B_KINOVA_ERR_SESSION;
+        *b->success = false;
+    }
 
     // Deactivate the router and cleanly disconnect from the transport object
     comm->transport_udp->disconnect();
@@ -151,32 +227,42 @@ void robif2b_kinova_gen3_shutdown(struct robif2b_kinova_gen3_nbx *b)
     delete comm->transport_tcp;
     delete comm->transport_udp;
     delete comm;
-
-    *b->success = true;
 }
 
 
 void robif2b_kinova_gen3_start(struct robif2b_kinova_gen3_nbx *b)
 {
     assert(b);
+    assert(b->error);
     assert(b->success);
     assert(b->comm);
+
+    *b->error = ROBIF2B_KINOVA_NO_ERROR;
+    *b->success = true;
 
     robif2b_kinova_gen3_comm *comm = b->comm;
 
     // Set the base in low-level servoing mode
     comm->servoing_mode.set_servoing_mode(k_api::Base::ServoingMode::LOW_LEVEL_SERVOING);
-    comm->base->SetServoingMode(comm->servoing_mode);
-
-    *b->success = true;
+    try {
+        comm->base->SetServoingMode(comm->servoing_mode);
+    } catch (k_api::KBasicException &) {
+        *b->error = ROBIF2B_KINOVA_ERR_SERVOING_MODE;
+        *b->success = false;
+        return;
+    }
 }
 
 
 void robif2b_kinova_gen3_stop(struct robif2b_kinova_gen3_nbx *b)
 {
     assert(b);
+    assert(b->error);
     assert(b->success);
     assert(b->comm);
+
+    *b->error = ROBIF2B_KINOVA_NO_ERROR;
+    *b->success = true;
 
     robif2b_kinova_gen3_comm *comm = b->comm;
 
@@ -184,35 +270,55 @@ void robif2b_kinova_gen3_stop(struct robif2b_kinova_gen3_nbx *b)
     k_api::ActuatorConfig::ControlModeInformation ctrl_mode_msg = k_api::ActuatorConfig::ControlModeInformation();
     ctrl_mode_msg.set_control_mode(k_api::ActuatorConfig::ControlMode::POSITION);
 
+    // Every step is attempted even after a failure: leaving the arm in torque
+    // mode or in low-level servoing is worse than reporting the first error.
     for (int i = 0; i < ROBIF2B_KINOVA_GEN3_NR_JOINTS; i++) {
         // Note that the actuator IDs start at 1
-        comm->actuator_config->SetControlMode(ctrl_mode_msg, i + 1);
+        try {
+            comm->actuator_config->SetControlMode(ctrl_mode_msg, i + 1);
+        } catch (k_api::KBasicException &) {
+            *b->error = ROBIF2B_KINOVA_ERR_CTRL_MODE;
+            *b->success = false;
+        }
     }
 
     // Set the servoing mode back to Single Level
     comm->servoing_mode.set_servoing_mode(k_api::Base::ServoingMode::SINGLE_LEVEL_SERVOING);
-    comm->base->SetServoingMode(comm->servoing_mode);
+    try {
+        comm->base->SetServoingMode(comm->servoing_mode);
+    } catch (k_api::KBasicException &) {
+        *b->error = ROBIF2B_KINOVA_ERR_SERVOING_MODE;
+        *b->success = false;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     // Make movement stop
-    b->comm->base->Stop();
+    try {
+        comm->base->Stop();
+    } catch (k_api::KBasicException &) {
+        *b->error = ROBIF2B_KINOVA_ERR_WRITE;
+        *b->success = false;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-    *b->success = true;
 }
 
 
 void robif2b_kinova_gen3_recover(struct robif2b_kinova_gen3_nbx *b)
 {
     assert(b);
+    assert(b->error);
     assert(b->success);
     assert(b->comm);
 
+    *b->error = ROBIF2B_KINOVA_NO_ERROR;
+    *b->success = true;
+
     try {
         b->comm->base->ClearFaults();
-        *b->success = true;
-    } catch (...) {
+    } catch (k_api::KBasicException &) {
+        *b->error = ROBIF2B_KINOVA_ERR_FAULT_CLEAR;
         *b->success = false;
+        return;
     }
 }
 
@@ -222,8 +328,12 @@ void robif2b_kinova_gen3_update(struct robif2b_kinova_gen3_nbx *b)
     assert(b);
     assert(b->ctrl_mode);
     assert(b->comm);
+    assert(b->error);
     assert(b->success);
     assert(b->cycle_time);
+
+    *b->error = ROBIF2B_KINOVA_NO_ERROR;
+    *b->success = true;
 
     robif2b_kinova_gen3_comm *comm = b->comm;
 
@@ -253,7 +363,13 @@ void robif2b_kinova_gen3_update(struct robif2b_kinova_gen3_nbx *b)
 
         for (int i = 0; i < ROBIF2B_KINOVA_GEN3_NR_JOINTS; i++) {
             // Note that the actuator IDs start at 1
-            comm->actuator_config->SetControlMode(ctrl_mode_msg, i + 1);
+            try {
+                comm->actuator_config->SetControlMode(ctrl_mode_msg, i + 1);
+            } catch (k_api::KBasicException &) {
+                *b->error = ROBIF2B_KINOVA_ERR_CTRL_MODE;
+                *b->success = false;
+                return;
+            }
         }
         usleep(100); // TODO: check if this is required. otherwise, more wrong servoing issues.
     }
@@ -294,12 +410,21 @@ void robif2b_kinova_gen3_update(struct robif2b_kinova_gen3_nbx *b)
         comm->command.mutable_actuators(i)->set_position(RAD_TO_DEG(pos));
     }
 
-    comm->feedback = comm->base_cyclic->Refresh(comm->command, 0);
+    try {
+        comm->feedback = comm->base_cyclic->Refresh(comm->command, 0);
+    } catch (k_api::KBasicException &) {
+        // The arm is no longer ours to drive; drop the torque so a resume
+        // cannot re-send what was in flight when it went away.
+        for (int i = 0; i < ROBIF2B_KINOVA_GEN3_NR_JOINTS; i++)
+            comm->command.mutable_actuators(i)->set_torque_joint(0.0);
+
+        *b->error = ROBIF2B_KINOVA_ERR_WRITE;
+        *b->success = false;
+        return;
+    }
     publish_measurement(b);
 
     b->ctrl_mode_prev = *b->ctrl_mode;
-
-    *b->success = true;
 }
 
 
@@ -330,12 +455,14 @@ void publish_hl_measurement(struct robif2b_kinova_gen3_hl_nbx *b)
     b->imu_lin_acc_msr[1] = comm->feedback.base().imu_acceleration_y();
     b->imu_lin_acc_msr[2] = comm->feedback.base().imu_acceleration_z();
 
-    b->tool_ext_wrench_msr[0] = comm->feedback.base().tool_external_wrench_force_x();
-    b->tool_ext_wrench_msr[1] = comm->feedback.base().tool_external_wrench_force_y();
-    b->tool_ext_wrench_msr[2] = comm->feedback.base().tool_external_wrench_force_z();
-    b->tool_ext_wrench_msr[3] = comm->feedback.base().tool_external_wrench_torque_x();
-    b->tool_ext_wrench_msr[4] = comm->feedback.base().tool_external_wrench_torque_y();
-    b->tool_ext_wrench_msr[5] = comm->feedback.base().tool_external_wrench_torque_z();
+    if (b->tool_ext_wrench_msr) {
+        b->tool_ext_wrench_msr[0] = comm->feedback.base().tool_external_wrench_force_x();
+        b->tool_ext_wrench_msr[1] = comm->feedback.base().tool_external_wrench_force_y();
+        b->tool_ext_wrench_msr[2] = comm->feedback.base().tool_external_wrench_force_z();
+        b->tool_ext_wrench_msr[3] = comm->feedback.base().tool_external_wrench_torque_x();
+        b->tool_ext_wrench_msr[4] = comm->feedback.base().tool_external_wrench_torque_y();
+        b->tool_ext_wrench_msr[5] = comm->feedback.base().tool_external_wrench_torque_z();
+    }
 }
 
 
