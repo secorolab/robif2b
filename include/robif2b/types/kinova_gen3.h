@@ -30,6 +30,20 @@ struct robif2b_kinova_gen3_config
 struct robif2b_kinova_gen3_comm;
 
 
+enum robif2b_kinova_gen3_error {
+    ROBIF2B_KINOVA_NO_ERROR = 0,
+    ROBIF2B_KINOVA_ERR_MEMORY,
+    ROBIF2B_KINOVA_ERR_CONNECTION,
+    ROBIF2B_KINOVA_ERR_SESSION,
+    ROBIF2B_KINOVA_ERR_SERVOING_MODE,
+    ROBIF2B_KINOVA_ERR_CTRL_MODE,
+    ROBIF2B_KINOVA_ERR_READ,
+    ROBIF2B_KINOVA_ERR_WRITE,
+    ROBIF2B_KINOVA_ERR_FAULT_CLEAR,
+    ROBIF2B_KINOVA_ERR_UNKNOWN
+};
+
+
 enum robif2b_kinova_arm_state
 {
     ROBIF2B_KINOVA_ARM_STATE_UNSPECIFIED         = 0,
@@ -81,6 +95,7 @@ struct robif2b_kinova_gen3_nbx
     uint32_t *jnt_fault_flags;
     uint32_t *jnt_warning_flags;
     enum robif2b_kinova_arm_state *arm_state;
+    enum robif2b_kinova_gen3_error *error;
     bool *success;
     // Internal state
     struct robif2b_kinova_gen3_comm *comm;
