@@ -83,7 +83,7 @@ struct robif2b_kinova_gen3_nbx
     double *jnt_volt_msr;                   // [V]
     double *jnt_temp_motor_msr;             // [deg C]
     double *jnt_temp_core_msr;              // [deg C]
-    double *jnt_comm_jitter_msr;            // [s]
+    double *jnt_comm_time_msr;              // [s] Kortex jitter_comm: a free-running clock
     double *arm_volt_msr;                   // [V]
     double *arm_cur_msr;                    // [A]
     double *cpu_temp_msr;                   // [deg C]

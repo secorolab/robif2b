@@ -50,8 +50,8 @@ void publish_measurement(struct robif2b_kinova_gen3_nbx *b)
             b->jnt_temp_motor_msr[i] = comm->feedback.actuators(i).temperature_motor();
         if (b->jnt_temp_core_msr)
             b->jnt_temp_core_msr[i] = comm->feedback.actuators(i).temperature_core();
-        if (b->jnt_comm_jitter_msr)
-            b->jnt_comm_jitter_msr[i] = US_TO_S(comm->feedback.actuators(i).jitter_comm());
+        if (b->jnt_comm_time_msr)
+            b->jnt_comm_time_msr[i] = US_TO_S(comm->feedback.actuators(i).jitter_comm());
         if (b->jnt_fault_flags)
             b->jnt_fault_flags[i] = comm->feedback.actuators(i).fault_bank_a();
         if (b->jnt_warning_flags)
