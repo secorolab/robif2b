@@ -270,8 +270,7 @@ void robif2b_kinova_gen3_stop(struct robif2b_kinova_gen3_nbx *b)
     k_api::ActuatorConfig::ControlModeInformation ctrl_mode_msg = k_api::ActuatorConfig::ControlModeInformation();
     ctrl_mode_msg.set_control_mode(k_api::ActuatorConfig::ControlMode::POSITION);
 
-    // Every step is attempted even after a failure: leaving the arm in torque
-    // mode or in low-level servoing is worse than reporting the first error.
+    // Keep going after a failure: an arm left in torque mode is worse than a lost first error.
     for (int i = 0; i < ROBIF2B_KINOVA_GEN3_NR_JOINTS; i++) {
         // Note that the actuator IDs start at 1
         try {
@@ -413,8 +412,7 @@ void robif2b_kinova_gen3_update(struct robif2b_kinova_gen3_nbx *b)
     try {
         comm->feedback = comm->base_cyclic->Refresh(comm->command, 0);
     } catch (k_api::KBasicException &) {
-        // The arm is no longer ours to drive; drop the torque so a resume
-        // cannot re-send what was in flight when it went away.
+        // Drop the torque so a resume cannot re-send what was in flight.
         for (int i = 0; i < ROBIF2B_KINOVA_GEN3_NR_JOINTS; i++)
             comm->command.mutable_actuators(i)->set_torque_joint(0.0);
 

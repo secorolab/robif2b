@@ -10,8 +10,7 @@
 #include "robif2b/types/robotiq_ft_sensor.h"
 #include "robotiq_ft_sensor_comm.hpp"
 
-// How many reads in a row have to come back empty before the connection is treated as gone rather
-// than the sample as late. At a 10 ms poll interval this is a tenth of a second of silence.
+// Empty reads in a row before the connection counts as gone: 0.1 s at the 10 ms poll.
 static constexpr int kMissesBeforeReconnect = 10;
 
 void robif2b_robotiq_ft_configure(struct robif2b_robotiq_ft_sensor_nbx *b) {
@@ -41,8 +40,7 @@ void robif2b_robotiq_ft_configure(struct robif2b_robotiq_ft_sensor_nbx *b) {
 
     if (!comm->sensor->connect()) return;
 
-    // A sensor left streaming by an earlier run answers nothing else, and one that is quiet has
-    // to be told to start. Both end up in the same place: a stream this process is reading.
+    // A sensor left streaming by an earlier run answers nothing else until stopped.
     if (!comm->sensor->stop_stream()) return;
     if (!comm->sensor->start_stream()) return;
 
@@ -79,9 +77,7 @@ void robif2b_robotiq_ft_update(struct robif2b_robotiq_ft_sensor_nbx *b) {
 
     const auto reading = comm->sensor->read();
     if (!reading) {
-        // A dropped frame costs one sample, but a converter that was unplugged or re-enumerated
-        // never comes back on its own: past a run of empty reads, reopen the port and restart the
-        // stream. The measurements keep their last value either way, and success says so.
+        // A re-enumerated converter never comes back on its own: reopen the port and restart.
         if (++comm->consecutive_misses >= kMissesBeforeReconnect) {
             comm->consecutive_misses = 0;
             comm->sensor->reconnect();

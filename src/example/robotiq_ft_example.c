@@ -55,8 +55,7 @@ int main(int argc, char **argv)
         robif2b_robotiq_ft_update(&ft_sensor);
         clock_gettime(CLOCK_MONOTONIC, &end_time);
 
-        // A missing sample is not the end of the run: the driver reconnects once enough of them
-        // in a row say the connection is gone, and the reading keeps its last value until then.
+        // The driver reconnects after enough misses in a row; the reading keeps its last value.
         if (!success) {
             printf("No sample this cycle\n");
             missed++;

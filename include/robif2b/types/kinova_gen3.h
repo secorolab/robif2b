@@ -59,10 +59,7 @@ enum robif2b_kinova_arm_state
 };
 
 
-// low-level servoing
-// Ports from jnt_volt_msr onwards are optional: only written when connected.
-// The base stops computing kinematics in this mode, so no TCP pose, twist or
-// external wrench is available here; use the high-level block for those.
+// low-level servoing; ports from jnt_volt_msr on are optional
 struct robif2b_kinova_gen3_nbx
 {
     // Configuration
