@@ -32,6 +32,7 @@ int main(int argc, char **argv)
     bool success = false;
     bool is_gripper_moving = false;
     uint8_t position_msr = 0;
+    double current_msr = 0.0;
     uint8_t position_cmd = 0;
     uint8_t speed_cmd = 0xFF;
     uint8_t force_cmd = 0xFF;
@@ -46,9 +47,10 @@ int main(int argc, char **argv)
     struct robif2b_robotiq_gripper_nbx gripper = {
         .serial.port = "/dev/ttyUSB0",
         .serial.baudrate = 115200,
-        .serial.timeout_ms = 1,
+        .serial.timeout_ms = 1000,      // what the field says: milliseconds
         .serial.slave_address = 0x09,
         .position_msr = &position_msr,
+        .current_msr = &current_msr,
         .is_gripper_moving = &is_gripper_moving,
         .obj_detection_status = &obj_status,
         .gripper_status = &gripper_status,
@@ -93,7 +95,7 @@ int main(int argc, char **argv)
         cycle_count += 1;
         cycle_sum_us += timespec_to_usec(&end_time) - timespec_to_usec(&start_time);
 
-        printf("Closing, gripper position: %d\n", position_msr);
+        printf("Closing, gripper position: %d, current: %.2f A\n", position_msr, current_msr);
         usleep(100 * USEC_IN_MSEC);
     }
     printf("Average update time for closing (%d cycles): %.5f msec\n",
@@ -125,7 +127,7 @@ int main(int argc, char **argv)
         cycle_count += 1;
         cycle_sum_us += timespec_to_usec(&end_time) - timespec_to_usec(&start_time);
 
-        printf("Opening, gripper position: %d\n", position_msr);
+        printf("Opening, gripper position: %d, current: %.2f A\n", position_msr, current_msr);
         usleep(100 * USEC_IN_MSEC);
     }
 

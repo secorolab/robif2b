@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include <robif2b/functions/kinova_gen3.h>
 
@@ -21,6 +22,9 @@ int main(int argc, char **argv)
     double cur_cmd[] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
     double imu_ang_vel_msr[] = { 0.0, 0.0, 0.0 };
     double imu_lin_acc_msr[] = { 0.0, 0.0, 0.0 };
+    uint32_t fault_flags = 0;
+    enum robif2b_kinova_gen3_error error = ROBIF2B_KINOVA_NO_ERROR;
+    enum robif2b_kinova_arm_state arm_state = ROBIF2B_KINOVA_ARM_STATE_UNSPECIFIED;
 
     struct robif2b_kinova_gen3_nbx rob = {
         // Configuration
@@ -45,6 +49,9 @@ int main(int argc, char **argv)
         .act_cur_cmd = cur_cmd,
         .imu_ang_vel_msr = imu_ang_vel_msr,
         .imu_lin_acc_msr = imu_lin_acc_msr,
+        .fault_flags = &fault_flags,
+        .arm_state = &arm_state,
+        .error = &error,
         .success = &success
     };
 
@@ -72,7 +79,13 @@ int main(int argc, char **argv)
     for (int i = 0; i < 3000; i++) {
         robif2b_kinova_gen3_update(&rob);
         if (!success) {
-            printf("Error during gen3_update\n");
+            printf("Error during gen3_update: error %d, arm state %d, faults 0x%08x\n",
+                   error, arm_state, fault_flags);
+            goto stop;
+        }
+
+        if (fault_flags) {
+            printf("Arm in fault (state %d): 0x%08x\n", arm_state, fault_flags);
             goto stop;
         }
 

@@ -8,6 +8,9 @@
 #include "robif2b/functions/robotiq_gripper.h"
 #include "robotiq_gripper_comm.hpp"
 
+// The gripper reports its motor current in counts worth 10 mA each.
+constexpr double kCurrentPerCount = 0.01;
+
 constexpr enum robif2b_robotiq_gripper_obj_status
 to_robif2b_obj_detection_status(rd::DefaultDriver::ObjectDetectionStatus status) {
     switch (status) {
@@ -56,6 +59,7 @@ void robif2b_robotiq_gripper_publish_measurements(struct robif2b_robotiq_gripper
         return;
     }
     // Reusing flags updated by above get_gripper_position() call
+    if (b->current_msr) *b->current_msr = comm->driver->get_last_gripper_current() * kCurrentPerCount;
     *b->obj_detection_status = to_robif2b_obj_detection_status(comm->driver->get_last_obj_detection_status());
     *b->gripper_status = to_robif2b_gripper_status(comm->driver->get_last_gripper_status());
     // Copy movement check logic from robotiq_driver
@@ -89,7 +93,8 @@ void robif2b_robotiq_gripper_configure(struct robif2b_robotiq_gripper_nbx *b) {
 
     comm->serial->set_port(b->serial.port);
     comm->serial->set_baudrate(b->serial.baudrate);
-    comm->serial->set_timeout(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::duration<double>(b->serial.timeout_ms)));
+    comm->serial->set_timeout(std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::duration<double, std::milli>(b->serial.timeout_ms)));
 
     comm->driver = std::make_unique<rd::DefaultDriver>(std::move(comm->serial));
     comm->driver->set_slave_address(b->serial.slave_address);
